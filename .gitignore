@@ -6,3 +6,4 @@ data/GSOD_2018-2023.rds
 scripts/.Rhistory
 data/lfs/GSOD_peril_1943-1995.rds
 data/lfs/GSOD_peril_1996-2023.rds
+*.gz

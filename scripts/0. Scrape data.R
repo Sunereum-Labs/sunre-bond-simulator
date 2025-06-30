@@ -1,8 +1,23 @@
-#install.packages(c("tidyquant"))
+#install.packages(c("tidyquant", "data.table"))
 #remotes::install_github("ropensci/GSODR")
 
 # load required packages
-library(tidyquant); library(GSODR); library(tidyverse)
+library(tidyquant); library(GSODR); library(tidyverse); library(data.table)
+
+# hail data scrapped from noaa
+base_url <- "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/"
+
+file <- "StormEvents_details-ftp_v1.0_d1950_c20250401.csv.gz"
+download.file(paste0(base_url, file), destfile = paste0("../data/", file))
+
+years <- 2021:2023
+for (year in years) {
+  file <- sprintf("StormEvents_details-ftp_v1.0_d%d_c20250520.csv.gz", year)
+  download.file(paste0(base_url, file), destfile = paste0("../data/", file))
+}
+
+file <- "StormEvents_details-ftp_v1.0_d2020_c20240620.csv.gz"
+download.file(paste0(base_url, file), destfile = paste0("../data/", file))
 
 # financial data
 eth_usd <- tq_get("ETH-USD", get = "stock.prices", from = "2020-12-20", to = "2024-12-31")

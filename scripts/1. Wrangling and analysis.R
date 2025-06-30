@@ -1,6 +1,7 @@
-# ---- Packages and GSOD attributes ----
+# ---- Packages ----
 library(tidyverse); library(maps); library(plotly); library(geosphere); library(sf); library(rnaturalearth)
 
+# ---- GSOD attributes ----
 # impose lat & lon filters that preseve the mainland and HI, remove PR and obviously offshore/remote nodes
 gsod_attributes <- readRDS("../data/GSOD_attributes.rds")
 weather_station_lookup <- gsod_attributes %>% 
@@ -629,6 +630,29 @@ plt_data2 <- weather_station_lookup %>%
 gsod_peril <- gsod_peril %>% 
   mutate(GUST = replace_na(GUST, MXSPD),
          GUST = pmax(GUST, MXSPD))
+
+# ---- NOAA hail data ----
+file <- "StormEvents_details-ftp_v1.0_d1950_c20250401.csv"
+hail <- read_csv(paste0("../data/", file)) %>% 
+  filter(EVENT_TYPE == "Hail")
+
+file <- "StormEvents_details-ftp_v1.0_d2020_c20240620.csv"
+temp <- read_csv(paste0("../data/", file)) %>% 
+  filter(EVENT_TYPE == "Hail")
+
+hail <- hail %>% 
+  rbind(temp)
+
+years <- c(1951:2019, 2021:2023)
+for (year in years) {
+  file <- sprintf("StormEvents_details-ftp_v1.0_d%d_c20250520.csv", year)
+  temp <- read_csv(paste0("../data/", file)) %>% 
+    filter(EVENT_TYPE == "Hail")
+  hail <- hail %>% 
+    rbind(temp)
+}
+
+# ---- TBD ----
 
 # now let's create an index for complete and incomplete data by weather station
 weather_station_completeness_index <- gsod_peril %>% 
