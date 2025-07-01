@@ -1,5 +1,5 @@
 # ---- Packages ----
-library(tidyverse); library(maps); library(plotly); library(geosphere); library(sf); library(rnaturalearth)
+library(tidyverse); library(maps); library(plotly); library(geosphere); library(sf); library(rnaturalearth); library(dbscan)
 
 # ---- GSOD attributes ----
 # impose lat & lon filters that preseve the mainland and HI, remove PR and obviously offshore/remote nodes
@@ -651,6 +651,169 @@ for (year in years) {
   hail <- hail %>% 
     rbind(temp)
 }
+
+tz_lookup <- c(
+  # Mainland U.S. timezones with DST
+  "EST-5" = "America/New_York",        # Eastern
+  "CST-6" = "America/Chicago",         # Central
+  "MST-7" = "America/Denver",          # Mountain (with DST)
+  "PST-8" = "America/Los_Angeles",     # Pacific (with DST)
+  
+  # Fixed offset timezones (no DST)
+  "MST"    = "America/Phoenix",        # Arizona (Mountain without DST)
+  "HST-10" = "Pacific/Honolulu",       # Hawaii (no DST)
+  "AKST-9" = "America/Anchorage",      # Alaska Standard (with DST)
+  
+  # Additional recognized NOAA zone labels
+  "AST-4"  = "America/Puerto_Rico",    # Atlantic (Puerto Rico, USVI, no DST)
+  "CHST-10" = "Pacific/Guam",          # Chamorro (Guam, CNMI, no DST)
+  "UTC"    = "UTC",                    # Coordinated Universal Time
+  "GMT"    = "Etc/GMT",                # Greenwich Mean Time
+  
+  # Legacy/alternate codes used in some NOAA records
+  "EDT" = "America/New_York",          # Eastern Daylight Time
+  "CDT" = "America/Chicago",           # Central Daylight Time
+  "MDT" = "America/Denver",            # Mountain Daylight Time
+  "PDT" = "America/Los_Angeles",       # Pacific Daylight Time
+  "AKDT" = "America/Anchorage",        # Alaska Daylight Time
+  
+  # Slightly ambiguous codes
+  "CST" = "America/Chicago",           # Central Daylight Time
+  "CSt" = "America/Chicago",           # Central Daylight Time
+  "EST" = "America/New_York",          # Eastern
+  "PST" = "America/Los_Angeles",       # Pacific (with DST)
+  "AST" = "America/Puerto_Rico",       # Atlantic (Puerto Rico, USVI, no DST)
+  "HST" = "Pacific/Honolulu",          # Hawaii (no DST)
+  
+  # Fallbacks for generic offset-style codes
+  "UTC-5" = "Etc/GMT+5",               # Note: sign is inverted in Etc/*
+  "UTC-6" = "Etc/GMT+6",
+  "UTC-7" = "Etc/GMT+7",
+  "UTC-8" = "Etc/GMT+8",
+  "UTC-9" = "Etc/GMT+9",
+  "UTC-10"= "Etc/GMT+10"
+)
+
+hail <- hail %>% 
+  mutate(BEGIN_DATE_TIME_PARSED = dmy_hms(BEGIN_DATE_TIME),
+         TZONE = tz_lookup[CZ_TIMEZONE],
+         BEGIN_DATE_TIME_PARSED = force_tzs(time = BEGIN_DATE_TIME_PARSED, 
+                                            tzones = TZONE,
+                                            tzone_out = "UTC")) %>% 
+  filter(!is.na(BEGIN_LAT) & !is.na(BEGIN_LON) & !is.na(BEGIN_DATE_TIME_PARSED)) 
+
+# let's cluster the reports into swaths, 
+hail_sf <- st_as_sf(hail,
+                    coords = c("BEGIN_LON","BEGIN_LAT"),
+                    crs = 4326) %>%
+  st_transform(crs = 3857)
+
+# maximum distance and temporal swath radius
+spatial_eps = 40*1000 # 40km in m
+temporal_eps = 2*60*60 # assume 20km/h = 2 hour in sec
+time_space_scale = spatial_eps/temporal_eps
+
+# coordinate object
+X = cbind(st_coordinates(hail_sf), as.numeric(hail_sf$BEGIN_DATE_TIME_PARSED) * time_space_scale)
+
+# remove missing coordinates 
+rows_to_remove = unique(which(is.na(X), arr.ind = TRUE)[,1])
+
+X_2 <- X[-rows_to_remove,]
+hail_sf_2 <- hail_sf[-rows_to_remove,]
+
+# clustering using dbscan
+swaths <- dbscan(x = X_2, eps = spatial_eps, minPts = 3)
+
+# swath ids
+hail_sf_2$swath_id <- ifelse(
+  swaths$cluster == 0,
+  paste0("solo_", seq_len(sum(swaths$cluster == 0))),
+  paste0("swath_", swaths$cluster)
+)
+
+rand <- hail_sf_2 %>% 
+  filter(substr(swath_id, 1, 5) == "swath") %>%
+  .$swath_id %>% 
+  unique() %>% 
+  sample(size = 100)
+  
+#  swath polygons --> plot
+swath_polys <- hail_sf_2 %>%
+  filter(swath_id %in% rand) %>% 
+  group_by(swath_id) %>%
+  summarise(
+    n_reports = n(),
+    geometry = st_combine(geometry) |> st_convex_hull()
+  ) %>%
+  ungroup()
+
+us_map <- ne_states(country = "united states of america", returnclass = "sf") %>% 
+  st_transform(crs = 3857)
+
+plt <- ggplot() +
+  geom_sf(data = us_map, fill = "gray80") +
+  geom_sf(data = swath_polys, aes(fill = n_reports), color = "black", alpha = 0.4) +
+  geom_sf(data = filter(hail_sf_2, swath_id %in% rand), color = "red", size = 0.5) +
+  scale_fill_viridis_c(option = "plasma") +
+  theme_minimal() +
+  labs(title = "DBSCAN-Detected Hail Swaths", fill = "# Reports")
+
+ggplotly(plt)
+
+# distribution of swath times and distances
+st_crs(hail_sf_2)
+
+max_dist_haversine <- function(geometry) {
+  coords <- st_coordinates(geometry)
+  
+  # Compute convex hull
+  hull_pts <- coords[chull(coords), ]
+  
+  # Compute pairwise haversine distances (in meters)
+  max(distm(hull_pts, fun = distHaversine))
+}
+
+plt_data <- hail_sf_2 %>% 
+  filter(substr(swath_id, 1, 5) == "swath") %>% 
+  st_transform(crs = 4326) %>% 
+  group_by(swath_id) %>% 
+  summarise(max_dist_m = max_dist_haversine(geometry),
+    max_time_m = (max(as.numeric(BEGIN_DATE_TIME_PARSED)) - min(as.numeric(BEGIN_DATE_TIME_PARSED)))/60)
+
+plt_data %>% 
+  mutate(max_dist_km = max_dist_m/1000) %>% 
+  select(-max_dist_m) %>% 
+  pivot_longer(cols = c("max_dist_km", "max_time_m"), names_to = "var", values_to = "value") %>%
+  ggplot() +
+  geom_boxplot(aes(y = value, group = var, x = var)) +
+  theme_minimal() +
+  labs(title = "Max swath distances along time and spatial axis")
+
+# create final file for export
+hail_swaths1 <- hail_sf_2 %>%
+  filter(substr(swath_id, 1, 5) == "swath") %>% 
+  group_by(swath_id) %>%
+  summarise(
+    nodes = n(),
+    MIN_DATETIME = min(BEGIN_DATE_TIME_PARSED),
+    MAX_DATETIME = max(BEGIN_DATE_TIME_PARSED),
+    MAGNITUDE = max(MAGNITUDE),
+    geometry = st_combine(geometry) |> st_convex_hull()) %>%
+  ungroup()
+
+hail_swaths2 <- hail_sf_2 %>%
+  filter(substr(swath_id, 1, 5) != "swath") %>%   
+  mutate(
+    nodes = 1,
+    MIN_DATETIME = BEGIN_DATE_TIME_PARSED,
+    MAX_DATETIME = BEGIN_DATE_TIME_PARSED) %>% 
+  select(swath_id, nodes, MIN_DATETIME, MAX_DATETIME, MAGNITUDE, geometry)
+
+hail_swaths <- hail_swaths1 %>% 
+  rbind(hail_swaths2)
+
+saveRDS(hail_swaths, file = "../data/hail_swaths.rds")
 
 # ---- TBD ----
 
