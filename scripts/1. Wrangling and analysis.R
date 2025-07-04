@@ -1,6 +1,11 @@
 # ---- Packages ----
 library(tidyverse); library(maps); library(plotly); library(geosphere); library(sf); library(rnaturalearth); library(dbscan)
 
+# ----- Load US solar farm lookup ----
+# downloaded from https://energy.usgs.gov/uspvdb/data/
+us_solar <- read_csv("../data/uspvdb_v3_0_20250430.csv")
+
+
 # ---- GSOD attributes ----
 # impose lat & lon filters that preseve the mainland and HI, remove PR and obviously offshore/remote nodes
 gsod_attributes <- readRDS("../data/GSOD_attributes.rds")
@@ -26,35 +31,31 @@ for (i in 1:nrow(weather_station_lookup)) {
 
 weather_station_lookup$OFFSHORE <- offshore
 
-plt <- ggplot() +
-  geom_sf(data = us_map, fill = "gray80") +
-  geom_sf(data = weather_station_lookup, aes(text = paste0(
-    "<b>Name:</b> ", NAME, "<br>"
-  ), color = OFFSHORE), size = 1) +
-  theme_minimal()
+#plt <- ggplot() +
+#  geom_sf(data = us_map, fill = "gray80") +
+#  geom_sf(data = weather_station_lookup, aes(text = paste0(
+#    "<b>Name:</b> ", NAME, "<br>"
+#  ), color = OFFSHORE), size = 1) +
+#  theme_minimal()
 
-ggplotly(plt)
+#ggplotly(plt)
 rm(list = c("station_state_boundary", "offshore", "plt")); gc()
 
 onshore_only = filter(weather_station_lookup, OFFSHORE == "FALSE")$STNID
 
 
 # ---- Load GSOD peril data ----
-gsod_peril2 <- readRDS("../data/GSOD_peril_1996-2023.rds")
+gsod_peril2 <- readRDS("../data/lfs/GSOD_peril_1996-2023.rds")
 gsod_peril2 <- gsod_peril2 %>% 
   filter(STNID %in% weather_station_lookup$STNID); gc()
 gsod_peril2 <- gsod_peril2 %>% 
   distinct(STNID, YEARMODA, .keep_all = TRUE); gc()
 
-gsod_peril1 <- readRDS("../data/GSOD_peril_1943-1995.rds")
+gsod_peril1 <- readRDS("../data/lfs/GSOD_peril_1943-1995.rds")
 gsod_peril1 <- gsod_peril1 %>% 
   filter(STNID %in% weather_station_lookup$STNID); gc()
 gsod_peril1 <- gsod_peril1 %>% 
   distinct(STNID, YEARMODA, .keep_all = TRUE); gc()
-
-# ----- Load US solar farm lookup ----
-# downloaded from https://energy.usgs.gov/uspvdb/data/
-us_solar <- read_csv("../data/uspvdb_v3_0_20250430.csv")
 
 # ---- GSOD peril data investigation ----
 
@@ -187,7 +188,7 @@ plt_data1 %>%
   theme_minimal() +
   ggtitle("Number of DEWP NAs by RH and TEMP NAs")
 
-# Plot 7: distrution of TEMP for DEWP NAs
+# Plot 7: distribution of TEMP for DEWP NAs
 plt_data1 <- gsod_peril1 %>% 
   filter(is.na(DEWP))
 
@@ -201,92 +202,107 @@ plt_data1 %>%
   ggtitle("Distribution of TEMP when DEWP is NA") +
   theme_minimal()
 
-# -- Large values of PRCP ---
-# We shouldn't have values above 43", exceptin HI given this is the highest in mainland US history 
+rm(plt_data1); rm(plt_data2); rm(plt_data3); rm(plt_data4); gc()
 
-plt_data1 <- gsod_peril1 %>%
-  filter(STNID %in% onshore_only) %>% 
-  filter(PRCP >= 43)
+# ---- NAs handling ----
+gsod_peril1 <- gsod_peril1 %>% 
+  mutate(GUST = coalesce(GUST, MXSPD),
+         GUST = pmax(GUST, MXSPD),
+         PRCP = if_else(I_RAIN_DRIZZLE == 1, PRCP, 0))
 
-plt_data2 <- gsod_peril2 %>%
-  filter(STNID %in% onshore_only) %>% 
-  filter(PRCP >= 43)
+gsod_peril2 <- gsod_peril2 %>% 
+  mutate(GUST = coalesce(GUST, MXSPD),
+         GUST = pmax(GUST, MXSPD),
+         PRCP = if_else(I_RAIN_DRIZZLE == 1, PRCP, 0))
+
+
+# ---- Algorithm: detecting large values of PRCP ----
+# We shouldn't have values above 43", except in HI given this is the highest in mainland US history 
+#plt_data1 <- gsod_peril1 %>%
+#  filter(STNID %in% onshore_only) %>% 
+#  filter(PRCP >= 43)
+
+#plt_data2 <- gsod_peril2 %>%
+#  filter(STNID %in% onshore_only) %>% 
+#  filter(PRCP >= 43)
 
 # Plot 8: histogram of PRCP >= 43" by rain flag
-plt_data1 %>% 
-  rbind(plt_data2) %>% 
-  ggplot() +
-  geom_histogram(aes(x = PRCP)) +
-  ggtitle("Distribution of improbably large PRCP by RAIN_DRIZZLE flag") +
-  scale_x_log10() +
-  facet_wrap(~I_RAIN_DRIZZLE, nrow = 2) +
-  theme_minimal()
+#plt_data1 %>% 
+#  rbind(plt_data2) %>% 
+#  ggplot() +
+#  geom_histogram(aes(x = PRCP)) +
+#  ggtitle("Distribution of improbably large PRCP by RAIN_DRIZZLE flag") +
+# scale_x_log10() +
+# facet_wrap(~I_RAIN_DRIZZLE, nrow = 2) +
+# theme_minimal()
 
 # Plot 9: histogram of PRCP >= 43" by snow flag
-plt_data1 %>% 
-  rbind(plt_data2) %>% 
-  ggplot() +
-  geom_histogram(aes(x = PRCP)) +
-  ggtitle("Distribution of improbably large PRCP by SNOW flag") +
-  scale_x_log10() +
-  facet_wrap(~I_SNOW_ICE, nrow = 2) +
-  theme_minimal()
+#plt_data1 %>% 
+#  rbind(plt_data2) %>% 
+# ggplot() +
+# geom_histogram(aes(x = PRCP)) +
+# ggtitle("Distribution of improbably large PRCP by SNOW flag") +
+# scale_x_log10() +
+# facet_wrap(~I_SNOW_ICE, nrow = 2) +
+# theme_minimal()
 
 # Plot 10: histogram of PRCP >= 43" by hail flag
-plt_data1 %>% 
-  rbind(plt_data2) %>% 
-  ggplot() +
-  geom_histogram(aes(x = PRCP)) +
-  ggtitle("Distribution of improbably large PRCP by HAIL flag") +
-  scale_x_log10() +
-  facet_wrap(~I_HAIL, nrow = 2) +
-  theme_minimal()
+#plt_data1 %>% 
+# rbind(plt_data2) %>% 
+# ggplot() +
+# geom_histogram(aes(x = PRCP)) +
+# ggtitle("Distribution of improbably large PRCP by HAIL flag") +
+# scale_x_log10() +
+# facet_wrap(~I_HAIL, nrow = 2) +
+# theme_minimal()
 
 # Plot 11: time series scatter plot of PRCP >= 43"
-plt_data1 %>% 
-  rbind(plt_data2) %>% 
-  ggplot() +
-  geom_point(aes(x = YEARMODA, y = PRCP), alpha = 0.1)
+#plt_data1 %>% 
+# rbind(plt_data2) %>% 
+# ggplot() +
+# geom_point(aes(x = YEARMODA, y = PRCP), alpha = 0.1) + 
+# theme_minimal() +
+# ggtilte("Time series scatter plot of PRCP >= 43")
 
 # Plot 12: suppose it's possible that some data is stored as tenths or hundredths of inches
-plt_data3 <- gsod_peril1 %>%
-  filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
-  group_by(STNID) %>% 
-  summarise(med = median(PRCP),
-            upper = quantile(PRCP, 0.75),
-            n = n())
+#plt_data3 <- gsod_peril1 %>%
+# filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
+# group_by(STNID) %>% 
+# summarise(med = median(PRCP),
+#           upper = quantile(PRCP, 0.75),
+#           n = n())
 
-plt_data4 <- gsod_peril2 %>%
-  filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
-  group_by(STNID) %>% 
-  summarise(med = median(PRCP),
-            upper = quantile(PRCP, 0.75),
-            n = n())
+#plt_data4 <- gsod_peril2 %>%
+# filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
+# group_by(STNID) %>% 
+# summarise(med = median(PRCP),
+#           upper = quantile(PRCP, 0.75),
+#           n = n())
 
 # these values are an order of magnitude too high
-plt_data3 %>% 
-  rbind(plt_data4) %>% 
-  arrange(desc(med)) %>% 
-  ungroup() %>% 
-  filter(n > 1000) %>% 
-  filter(med >= quantile(med, 0.75)) %>% 
-  ggplot() +
-  geom_point(aes(y = med, x = fct_reorder(STNID, med, .desc = TRUE))) +
-  geom_errorbar(aes(ymin = med, ymax = upper, x = fct_reorder(STNID, med, .desc = TRUE))) +
-  scale_y_log10() +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-  ggtitle("Median and upper quantile of PRCP for top 25% of weather stations with >1000 record rainy days")
+#plt_data3 %>% 
+#  rbind(plt_data4) %>% 
+# arrange(desc(med)) %>% 
+# ungroup() %>% 
+# filter(n > 1000) %>% 
+# filter(med >= quantile(med, 0.75)) %>% 
+# ggplot() +
+# geom_point(aes(y = med, x = fct_reorder(STNID, med, .desc = TRUE))) +
+# geom_errorbar(aes(ymin = med, ymax = upper, x = fct_reorder(STNID, med, .desc = TRUE))) +
+# scale_y_log10() +
+# theme_minimal() +
+# theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+# ggtitle("Median and upper quantile of PRCP for top 25% of weather stations with >1000 record rainy days")
 
 # Plot 13: let's just plot a boxplot of all the weather station medians
 # - most values are above 4" which is definitely too high
-plt_data3 %>% 
-  rbind(plt_data4) %>% 
-  filter(n > 1000) %>% 
-  ggplot() +
-  geom_boxplot(aes(y = med)) +
-  ggtitle("Median PRCP distribution") +
-  theme_minimal()
+#plt_data3 %>% 
+#  rbind(plt_data4) %>% 
+#  filter(n > 1000) %>% 
+# ggplot() +
+# geom_boxplot(aes(y = med)) +
+# ggtitle("Median PRCP distribution") +
+# theme_minimal()
 
 # compute global maxes out of function across both data frames for prcp_adjust, 
 #to eliminate checks, if rainfall is recorded at any time (>=42 + 1" mainland, 
@@ -394,51 +410,51 @@ prcp_adjusted1 <- prcp_adjust(df = gsod_peril1, id_col = "STNID",
 prcp_adjusted2 <- prcp_adjust(df = gsod_peril2, id_col = "STNID",
                               date_col = "YEARMODA", state_col = "STATE")
 
-# Plot 14: now let's REBASE or LEAVE PRCP on weather stations, then plot stations to be CHECK'ed
-plt_data1 <- gsod_peril1 %>% 
-  filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
-  mutate(yr = year(YEARMODA)) %>% 
-  left_join(select(prcp_adjusted1,
-                   STNID, STATE, yr, flag), by = c("STNID", "STATE", "yr")) %>% 
-  mutate(PRCP = if_else(flag == "REBASE", PRCP/10, PRCP),
-         id_col = if_else(flag == "CHECK", STNID, "STATE")) %>% 
-  select(id_col, STATE, PRCP)
+# MANUAL CHECK: now let's REBASE or LEAVE PRCP on weather stations, then plot stations to be CHECK'ed
+#plt_data1 <- gsod_peril1 %>% 
+#  filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
+#  mutate(yr = year(YEARMODA)) %>% 
+#  left_join(select(prcp_adjusted1,
+#                   STNID, STATE, yr, flag), by = c("STNID", "STATE", "yr")) %>% 
+#  mutate(PRCP = if_else(flag == "REBASE", PRCP/10, PRCP),
+#         id_col = if_else(flag == "CHECK", STNID, "STATE")) %>% 
+#  select(id_col, STATE, PRCP)
 
-plt_data2 <- gsod_peril2 %>% 
-  filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
-  mutate(yr = year(YEARMODA)) %>% 
-  left_join(select(prcp_adjusted2,
-                   STNID, STATE, yr, flag), by = c("STNID", "STATE", "yr")) %>% 
-  mutate(PRCP = if_else(flag == "REBASE", PRCP/10, PRCP),
-         id_col = if_else(flag == "CHECK", STNID, "STATE")) %>% 
-  select(id_col, STATE, PRCP)
+#plt_data2 <- gsod_peril2 %>% 
+#  filter(I_RAIN_DRIZZLE == 1 & !is.na(PRCP) & PRCP > 0) %>% 
+#  mutate(yr = year(YEARMODA)) %>% 
+#  left_join(select(prcp_adjusted2,
+#                   STNID, STATE, yr, flag), by = c("STNID", "STATE", "yr")) %>% 
+#  mutate(PRCP = if_else(flag == "REBASE", PRCP/10, PRCP),
+#         id_col = if_else(flag == "CHECK", STNID, "STATE")) %>% 
+#  select(id_col, STATE, PRCP)
 
 
 # toggle each state plot, note the weather stations that are not being left here
-check_states <- unique(c(filter(plt_data1, id_col != "STATE")$STATE, 
-                         filter(plt_data2, id_col != "STATE")$STATE))
+#check_states <- unique(c(filter(plt_data1, id_col != "STATE")$STATE, 
+#                         filter(plt_data2, id_col != "STATE")$STATE))
 to_leave = c("722406-12927", "725837-99999", "723894-03181")
-state = check_states[37]
-plt_data1 %>% 
-  rbind(plt_data2) %>% 
-  filter(STATE == state) %>%
-  ggplot() +
-  geom_boxplot(aes(x = reorder(id_col, -PRCP, FUN = median), y = PRCP)) +
-  geom_hline(aes(yintercept = 0.3)) +
-  geom_hline(aes(yintercept = 1)) +
-  geom_hline(aes(yintercept = 2)) +
-  geom_hline(aes(yintercept = 4)) +
-  ylim(0, 10) +
-  ggtitle("PRCP distribution for CHECK value weather stations vs state") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-  theme_minimal()
+#state = check_states[37]
+#plt_data1 %>% 
+#  rbind(plt_data2) %>% 
+#  filter(STATE == state) %>%
+#  ggplot() +
+#  geom_boxplot(aes(x = reorder(id_col, -PRCP, FUN = median), y = PRCP)) +
+#  geom_hline(aes(yintercept = 0.3)) +
+#  geom_hline(aes(yintercept = 1)) +
+#  geom_hline(aes(yintercept = 2)) +
+#  geom_hline(aes(yintercept = 4)) +
+#  ylim(0, 10) +
+#  ggtitle("PRCP distribution for CHECK value weather stations vs state") +
+#  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+#  theme_minimal()
 
 # ask GPT to evaluate whether any of these areas should have higher than average intensity rainfall
-weather_station_lookup %>% 
-  filter(STATE == state) %>% 
-  filter(STNID %in% unique(c(plt_data1$id_col, plt_data2$id_col))) %>% 
-  .$NAME %>% 
-  paste0(., collapse = ", ")
+#weather_station_lookup %>% 
+#  filter(STATE == state) %>% 
+#  filter(STNID %in% unique(c(plt_data1$id_col, plt_data2$id_col))) %>% 
+#  .$NAME %>% 
+#  paste0(., collapse = ", ")
 
 # let's now convert CHECKs to REBASE unless marked to be left as a leave
 prcp_adjusted1 <- prcp_adjusted1 %>% 
@@ -456,6 +472,7 @@ prcp_adjusted2 <- prcp_adjusted2 %>%
   rename("flag" = flag2)
 
 # looking at the state boxplots, the distributions still seem quite high
+
 # let's now look at extremely high annual rainfall for those being "left"
 prcp_leave <- prcp_adjusted1 %>% 
   rbind(prcp_adjusted2) %>% 
@@ -530,7 +547,7 @@ prcp_check2 <- prcp_check2 %>%
   left_join(weather_station_lookup, by = c("STNID", "STATE"))
 
 # (manually check the data frame)
-View(filter(prcp_check2, flag == "CHECK"))
+#View(filter(prcp_check2, flag == "CHECK"))
 
 to_leave2 = c("723894-03181_2017", "722404-13941_2019", "722406-12927_2012", "723626-03737_2010",
               "720358-53999_2022", "722173-53951_2023")
@@ -556,284 +573,54 @@ prcp_adjusted <- prcp_adjusted1 %>%
 rm(list = c("plt_data1", "plt_data2", "plt_data3", "plt_data4",
             "prcp_adjusted1", "prcp_adjusted2", "prcp_check2", "prcp_leave"))
 
-# -- DEWP large values --
-# view points above 30*
-gsod_peril1 %>%
-  select(STNID, YEARMODA, DEWP, TEMP, MAX) %>% 
-  rbind(select(gsod_peril2,
-               STNID, YEARMODA, DEWP, TEMP, MAX)) %>% 
-  filter(DEWP > 30) %>% 
-  arrange(desc(DEWP)) %>% 
-  left_join(weather_station_lookup, by = "STNID") %>%
-  filter(OFFSHORE == "FALSE") %>% 
-  View()
-
 # ---- GSOD peril data merge & data handling ----
 gsod_peril1 <- gsod_peril1 %>% 
-  select(-RH, -I_HAIL, -I_SNOW_ICE)
+  select(-RH, -I_HAIL, -I_SNOW_ICE, -I_RAIN_DRIZZLE)
 
 gsod_peril2 <- gsod_peril2 %>% 
-  select(-RH, -I_HAIL, -I_SNOW_ICE)
-
-rm(plt_data1); rm(plt_data2); rm(plt_data3); rm(plt_data4); gc()
+  select(-RH, -I_HAIL, -I_SNOW_ICE, -I_RAIN_DRIZZLE)
 
 gsod_peril <- gsod_peril1 %>% 
   rbind(gsod_peril2)
 rm(list = c("gsod_peril1", "gsod_peril2")); gc()
 
-# adjustments to peril fields based on the previous investigation
+# remove offshore weather stations
 gsod_peril <- gsod_peril %>% 
   # remove offshore weather stations
-  filter(STNIND %in% onshore_only)
+  filter(STNID %in% onshore_only)
 
-# peril summary with offshore stations
+# adjust PRCP
+gsod_peril <- gsod_peril %>% 
+  mutate(yr = year(YEARMODA)) %>% 
+  left_join(prcp_adjusted, by = c("STNID", "STATE", "yr")) %>% 
+  mutate(PRCP = case_when(flag == "REBASE" ~ PRCP/10,
+                        TRUE ~ PRCP)) %>% 
+  select(-flag, -yr, -STATE)
+
 gsod_peril %>% summary()
 
-gsod_peril <- gsod_peril %>% 
-  # Wind peril adjustments
-  mutate(GUST = replace_na(GUST, MXSPD),
-         GUST = pmax(GUST, MXSPD))
+saveRDS(gsod_peril, "../data/lfs/gsod_peril.rds")
 
-# peril summary without offshore stations
-gsod_peril %>% filter(STNID %in% onshore_only) %>% summary()
 
-# ---- Summary value investigation ----
-
-plt <- plt_data %>% 
-  group_by(STNID, NAME, ELEVATION, geometry) %>% 
-  summarise(n = n()) %>% 
-  ungroup() %>%
-  ggplot() +
-  geom_sf(data = us_map, fill = "gray80") +
-  geom_sf(aes(text = paste0(
-    "<b>Name:</b> ", NAME, "<br>",
-    "<b>Elevation:</b> ", ELEVATION, "<br>",
-    "<b>N:</b> ", n),
-    color = n,
-    geometry = geometry),
-    size = 0.5) +
-  scale_color_gradient2(low = "orange", mid ="black", high = "lightblue", midpoint = log10(50), trans = "log10") +
-  theme_minimal()
-
-ggplotly(plt)
-
-# ---- NAs handling ----
-# hypothesis -- stations recording a PRCP > 43ins are located offshore
-plt_data1 <- gsod_peril %>% 
-  select(STNID, STATE, YEARMODA, PRCP) %>% 
-  filter(PRCP > 43) %>% 
-  
-
-plt_data2 <- weather_station_lookup %>% 
-  filter(STNID %in% plt_data1$STNID)
-
-gsod_peril <- gsod_peril %>% 
-  mutate(GUST = replace_na(GUST, MXSPD),
-         GUST = pmax(GUST, MXSPD))
-
-# ---- NOAA hail data ----
-file <- "StormEvents_details-ftp_v1.0_d1950_c20250401.csv"
-hail <- read_csv(paste0("../data/", file)) %>% 
-  filter(EVENT_TYPE == "Hail")
-
-file <- "StormEvents_details-ftp_v1.0_d2020_c20240620.csv"
-temp <- read_csv(paste0("../data/", file)) %>% 
-  filter(EVENT_TYPE == "Hail")
-
-hail <- hail %>% 
-  rbind(temp)
-
-years <- c(1951:2019, 2021:2023)
-for (year in years) {
-  file <- sprintf("StormEvents_details-ftp_v1.0_d%d_c20250520.csv", year)
-  temp <- read_csv(paste0("../data/", file)) %>% 
-    filter(EVENT_TYPE == "Hail")
-  hail <- hail %>% 
-    rbind(temp)
-}
-
-tz_lookup <- c(
-  # Mainland U.S. timezones with DST
-  "EST-5" = "America/New_York",        # Eastern
-  "CST-6" = "America/Chicago",         # Central
-  "MST-7" = "America/Denver",          # Mountain (with DST)
-  "PST-8" = "America/Los_Angeles",     # Pacific (with DST)
-  
-  # Fixed offset timezones (no DST)
-  "MST"    = "America/Phoenix",        # Arizona (Mountain without DST)
-  "HST-10" = "Pacific/Honolulu",       # Hawaii (no DST)
-  "AKST-9" = "America/Anchorage",      # Alaska Standard (with DST)
-  
-  # Additional recognized NOAA zone labels
-  "AST-4"  = "America/Puerto_Rico",    # Atlantic (Puerto Rico, USVI, no DST)
-  "CHST-10" = "Pacific/Guam",          # Chamorro (Guam, CNMI, no DST)
-  "UTC"    = "UTC",                    # Coordinated Universal Time
-  "GMT"    = "Etc/GMT",                # Greenwich Mean Time
-  
-  # Legacy/alternate codes used in some NOAA records
-  "EDT" = "America/New_York",          # Eastern Daylight Time
-  "CDT" = "America/Chicago",           # Central Daylight Time
-  "MDT" = "America/Denver",            # Mountain Daylight Time
-  "PDT" = "America/Los_Angeles",       # Pacific Daylight Time
-  "AKDT" = "America/Anchorage",        # Alaska Daylight Time
-  
-  # Slightly ambiguous codes
-  "CST" = "America/Chicago",           # Central Daylight Time
-  "CSt" = "America/Chicago",           # Central Daylight Time
-  "EST" = "America/New_York",          # Eastern
-  "PST" = "America/Los_Angeles",       # Pacific (with DST)
-  "AST" = "America/Puerto_Rico",       # Atlantic (Puerto Rico, USVI, no DST)
-  "HST" = "Pacific/Honolulu",          # Hawaii (no DST)
-  
-  # Fallbacks for generic offset-style codes
-  "UTC-5" = "Etc/GMT+5",               # Note: sign is inverted in Etc/*
-  "UTC-6" = "Etc/GMT+6",
-  "UTC-7" = "Etc/GMT+7",
-  "UTC-8" = "Etc/GMT+8",
-  "UTC-9" = "Etc/GMT+9",
-  "UTC-10"= "Etc/GMT+10"
-)
-
-hail <- hail %>% 
-  mutate(BEGIN_DATE_TIME_PARSED = dmy_hms(BEGIN_DATE_TIME),
-         TZONE = tz_lookup[CZ_TIMEZONE],
-         BEGIN_DATE_TIME_PARSED = force_tzs(time = BEGIN_DATE_TIME_PARSED, 
-                                            tzones = TZONE,
-                                            tzone_out = "UTC")) %>% 
-  filter(!is.na(BEGIN_LAT) & !is.na(BEGIN_LON) & !is.na(BEGIN_DATE_TIME_PARSED)) 
-
-# let's cluster the reports into swaths, 
-hail_sf <- st_as_sf(hail,
-                    coords = c("BEGIN_LON","BEGIN_LAT"),
-                    crs = 4326) %>%
-  st_transform(crs = 3857)
-
-# maximum distance and temporal swath radius
-spatial_eps = 40*1000 # 40km in m
-temporal_eps = 2*60*60 # assume 20km/h = 2 hour in sec
-time_space_scale = spatial_eps/temporal_eps
-
-# coordinate object
-X = cbind(st_coordinates(hail_sf), as.numeric(hail_sf$BEGIN_DATE_TIME_PARSED) * time_space_scale)
-
-# remove missing coordinates 
-rows_to_remove = unique(which(is.na(X), arr.ind = TRUE)[,1])
-
-X_2 <- X[-rows_to_remove,]
-hail_sf_2 <- hail_sf[-rows_to_remove,]
-
-# clustering using dbscan
-swaths <- dbscan(x = X_2, eps = spatial_eps, minPts = 3)
-
-# swath ids
-hail_sf_2$swath_id <- ifelse(
-  swaths$cluster == 0,
-  paste0("solo_", seq_len(sum(swaths$cluster == 0))),
-  paste0("swath_", swaths$cluster)
-)
-
-rand <- hail_sf_2 %>% 
-  filter(substr(swath_id, 1, 5) == "swath") %>%
-  .$swath_id %>% 
-  unique() %>% 
-  sample(size = 100)
-  
-#  swath polygons --> plot
-swath_polys <- hail_sf_2 %>%
-  filter(swath_id %in% rand) %>% 
-  group_by(swath_id) %>%
-  summarise(
-    n_reports = n(),
-    geometry = st_combine(geometry) |> st_convex_hull()
-  ) %>%
-  ungroup()
-
-us_map <- ne_states(country = "united states of america", returnclass = "sf") %>% 
-  st_transform(crs = 3857)
-
-plt <- ggplot() +
-  geom_sf(data = us_map, fill = "gray80") +
-  geom_sf(data = swath_polys, aes(fill = n_reports), color = "black", alpha = 0.4) +
-  geom_sf(data = filter(hail_sf_2, swath_id %in% rand), color = "red", size = 0.5) +
-  scale_fill_viridis_c(option = "plasma") +
-  theme_minimal() +
-  labs(title = "DBSCAN-Detected Hail Swaths", fill = "# Reports")
-
-ggplotly(plt)
-
-# distribution of swath times and distances
-st_crs(hail_sf_2)
-
-max_dist_haversine <- function(geometry) {
-  coords <- st_coordinates(geometry)
-  
-  # Compute convex hull
-  hull_pts <- coords[chull(coords), ]
-  
-  # Compute pairwise haversine distances (in meters)
-  max(distm(hull_pts, fun = distHaversine))
-}
-
-plt_data <- hail_sf_2 %>% 
-  filter(substr(swath_id, 1, 5) == "swath") %>% 
-  st_transform(crs = 4326) %>% 
-  group_by(swath_id) %>% 
-  summarise(max_dist_m = max_dist_haversine(geometry),
-    max_time_m = (max(as.numeric(BEGIN_DATE_TIME_PARSED)) - min(as.numeric(BEGIN_DATE_TIME_PARSED)))/60)
-
-plt_data %>% 
-  mutate(max_dist_km = max_dist_m/1000) %>% 
-  select(-max_dist_m) %>% 
-  pivot_longer(cols = c("max_dist_km", "max_time_m"), names_to = "var", values_to = "value") %>%
-  ggplot() +
-  geom_boxplot(aes(y = value, group = var, x = var)) +
-  theme_minimal() +
-  labs(title = "Max swath distances along time and spatial axis")
-
-# create final file for export
-hail_swaths1 <- hail_sf_2 %>%
-  filter(substr(swath_id, 1, 5) == "swath") %>% 
-  group_by(swath_id) %>%
-  summarise(
-    nodes = n(),
-    MIN_DATETIME = min(BEGIN_DATE_TIME_PARSED),
-    MAX_DATETIME = max(BEGIN_DATE_TIME_PARSED),
-    MAGNITUDE = max(MAGNITUDE),
-    geometry = st_combine(geometry) |> st_convex_hull()) %>%
-  ungroup()
-
-hail_swaths2 <- hail_sf_2 %>%
-  filter(substr(swath_id, 1, 5) != "swath") %>%   
-  mutate(
-    nodes = 1,
-    MIN_DATETIME = BEGIN_DATE_TIME_PARSED,
-    MAX_DATETIME = BEGIN_DATE_TIME_PARSED) %>% 
-  select(swath_id, nodes, MIN_DATETIME, MAX_DATETIME, MAGNITUDE, geometry)
-
-hail_swaths <- hail_swaths1 %>% 
-  rbind(hail_swaths2)
-
-saveRDS(hail_swaths, file = "../data/hail_swaths.rds")
-
-# ---- TBD ----
+# ---- GSOD/solar farm mapping ----
 
 # now let's create an index for complete and incomplete data by weather station
 weather_station_completeness_index <- gsod_peril %>% 
   mutate(YEAR = year(YEARMODA)) %>% 
   group_by(STNID, YEAR) %>% 
-  summarise(across(-c(1:2), ~sum(!is.na(.)))) %>% 
+  # ignore YEARMODA
+  summarise(across(-c(1), ~sum(!is.na(.)))) %>% 
   ungroup() %>% 
   mutate(across(colnames(.)[-c(1, 2)], ~if_else(. >= 345, "COMPLETE", "INCOMPLETE")))
   
 # join on state and concatenate station list
 weather_station_completeness_index <- weather_station_completeness_index %>% 
-  left_join(select(weather_station_lookup, STNID, STATE), by = "STNID") %>% 
+  left_join(select(as_tibble(weather_station_lookup), STNID, STATE), by = "STNID") %>% 
   filter(!is.na(STATE))
 
-# now let's map (AC > 20MW) solar farms to the nearest COMPLETE weather station by year
+# now let's map solar farms to the nearest COMPLETE weather station by year
 # - solar farm latitude and longitude are calculated using AEA BUT are in degrees, so can compute distances directly
 solar_farm_lookup <- us_solar %>% 
-  filter(p_cap_ac > 20) %>% 
   filter(xlong > -160 & xlong < -66 & ylat > 18 & ylat < 50) %>% 
   select(case_id, p_name, p_year, p_state, p_county, ylat, xlong, p_cap_ac)
 
@@ -841,7 +628,7 @@ case_id = c(); STNID = c(); distance = c()
 for (i in 1:nrow(solar_farm_lookup)) {
   
   dist_vctr <- distm(x = c(solar_farm_lookup$xlong[i], solar_farm_lookup$ylat[i]),
-                    y = cbind(weather_station_lookup$LONGITUDE, weather_station_lookup$LATITUDE),
+                    y = st_coordinates(weather_station_lookup$geometry),
                     fun = distHaversine)/1000
   
   case_id = c(case_id, rep(solar_farm_lookup$case_id[i], length(dist_vctr)))
@@ -870,23 +657,21 @@ for (p in c("GUST", "MXSPD", "PRCP", "MAX", "TEMP", "DEWP")) {
   }
 }
 
+solar_stnid_lookup_table %>% 
+  ggplot() +
+  geom_boxplot(aes(y = distance, x = PERIL, group = PERIL)) +
+  theme_minimal() +
+  labs(title = "Distribution of solar farm/weather station nearest complete node distances (km)") +
+  ylim(0, 250)
+
 # map data
-us_map2 <- map_data("state")
-
-state_codes <- tibble(
-  state = tolower(state.name),
-  code = state.abb,
-  stringsAsFactors = FALSE)
-
-state_centroids <- us_map2 %>%
-  group_by(region) %>%
-  summarise(long = mean(range(long)), lat = mean(range(lat))) %>%
-  left_join(state_codes, by = c("region" = "state"))
+us_map <- ne_states(country = "united states of america", returnclass = "sf") %>% 
+  st_transform(crs = 4326)
 
 # plot our weather station look-up on the map
 plt <- ggplot() +
   geom_sf(data = us_map, fill = "gray95", color = "white") +
-  geom_sf(data = weather_station_lookup, 
+  geom_sf(data = filter(weather_station_lookup, STNID %in% unique(gsod_peril$STNID)),
                            aes(text = paste0(
                                  "<b>Name:</b> ", NAME, "<br>",
                                  "<b>Station ID:</b> ", STNID, "<br>",
@@ -908,7 +693,9 @@ plt <- ggplot() +
                  )),
              color = "orange", size = 0.3) +
   coord_fixed(1.3) +
-  theme_minimal()
+  theme_minimal() +
+  xlim(-160, -66) +
+  ylim(18, 50)
 
 plt <- ggplotly(plt)
 
@@ -919,7 +706,7 @@ write_csv(solar_stnid_lookup_table, "../data/solar_stnid_lookup.csv")
 
 
 # find 1-in-2 and 1-in-5 year triggers for each peril variable
-vars = colnames(gsod_peril)[-c(1:3)]
+vars = colnames(gsod_peril)[-c(1:2)]
 
 N_2 = c()
 N_5 = c()
@@ -976,3 +763,261 @@ for (i in 1:length(vars)) {
 }
 
 write_csv(P, "state_premiums.csv")
+
+
+# ---- NOAA Storm Events ----
+file <- "StormEvents_details-ftp_v1.0_d1950_c20250401.csv"
+noaa <- read_csv(paste0("../data/", file))
+
+file <- "StormEvents_details-ftp_v1.0_d2020_c20240620.csv"
+temp <- read_csv(paste0("../data/", file))
+
+noaa <- noaa %>% 
+  rbind(temp)
+
+years <- c(1951:2019, 2021:2023)
+for (year in years) {
+  file <- sprintf("StormEvents_details-ftp_v1.0_d%d_c20250520.csv", year)
+  temp <- read_csv(paste0("../data/", file))
+  noaa <- noaa %>% 
+    rbind(temp)
+}
+
+noaa %>% 
+  group_by(EVENT_TYPE) %>% 
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  View()
+
+tz_lookup <- c(
+  # Mainland U.S. timezones with DST
+  "AST-4" = "America/Halifax",         # Atlantic
+  "EST-5" = "America/New_York",        # Eastern
+  "CST-6" = "America/Chicago",         # Central
+  "MST-7" = "America/Denver",          # Mountain (with DST)
+  "PST-8" = "America/Los_Angeles",     # Pacific (with DST)
+  
+  # Fixed offset timezones (no DST)
+  "MST"    = "America/Phoenix",        # Arizona (Mountain without DST)
+  "HST-10" = "Pacific/Honolulu",       # Hawaii (no DST)
+  "AKST-9" = "America/Anchorage",      # Alaska Standard (with DST)
+  "GST10"  = "Pacific/Guam",           # Guam
+  "SST-11" = "Pacific/Pago_Pago",      # Samoa Standard
+  
+  # Additional recognized NOAA zone labels
+  "AST-4"  = "America/Puerto_Rico",    # Atlantic (Puerto Rico, USVI, no DST)
+  "CHST-10" = "Pacific/Guam",          # Chamorro (Guam, CNMI, no DST)
+  "UTC"    = "UTC",                    # Coordinated Universal Time
+  "GMT"    = "Etc/GMT",                # Greenwich Mean Time
+  
+  # Legacy/alternate codes used in some NOAA records
+  "AST" = "America/Puerto_Rico",       # Atlantic (Puerto Rico, USVI, no DST)
+  "EDT" = "America/New_York",          # Eastern Daylight Time
+  "CDT" = "America/Chicago",           # Central Daylight Time
+  "MDT" = "America/Denver",            # Mountain Daylight Time
+  "PDT" = "America/Los_Angeles",       # Pacific Daylight Time
+  "AKDT" = "America/Anchorage",        # Alaska Daylight Time
+  "SST" = "Pacific/Pago_Pago",         # Samoa Standard
+  "EDT-4" = "America/New_York",        # Eastern Daylight Time
+  "CDT-5" = "America/Chicago",         # Central Daylight Time
+  "PDT-7" = "America/Los_Angeles",     # Pacific Daylight Time
+  
+  # Slightly ambiguous codes
+  "CST" = "America/Chicago",           # Central Daylight Time
+  "CSt" = "America/Chicago",           # Central Daylight Time
+  "EST" = "America/New_York",          # Eastern
+  "ESt" = "America/New_York",          # Eastern
+  "PST" = "America/Los_Angeles",       # Pacific (with DST)
+  "AST" = "America/Puerto_Rico",       # Atlantic (Puerto Rico, USVI, no DST)
+  "HST" = "Pacific/Honolulu",          # Hawaii (no DST)
+  "UNK" = "America/Chicago",           # UNK is likely Unknown, set this to Chicago
+  "CSC" = "America/Chicago",           # CSC is likely a typo for CST
+  "SCT" = "America/Chicago",           # SCT is likely a typo for CST
+  
+  # Fallbacks for generic offset-style codes
+  "UTC-5" = "Etc/GMT+5",               # Note: sign is inverted in Etc/*
+  "UTC-6" = "Etc/GMT+6",
+  "UTC-7" = "Etc/GMT+7",
+  "UTC-8" = "Etc/GMT+8",
+  "UTC-9" = "Etc/GMT+9",
+  "UTC-10"= "Etc/GMT+10"
+)
+
+noaa <- noaa %>% 
+  mutate(BEGIN_DATE_TIME_PARSED = dmy_hms(BEGIN_DATE_TIME),
+         TZONE = tz_lookup[CZ_TIMEZONE],
+         BEGIN_DATE_TIME_PARSED = force_tzs(time = BEGIN_DATE_TIME_PARSED, 
+                                            tzones = TZONE,
+                                            tzone_out = "UTC"))
+
+
+# ---- Hail ----
+# let's cluster the reports into swaths, 
+hail_sf <- noaa %>% 
+  filter(EVENT_TYPE == "Hail") %>% 
+  filter(!is.na(BEGIN_LAT) & !is.na(BEGIN_LON)) %>% 
+  st_as_sf(coords = c("BEGIN_LON","BEGIN_LAT"),
+                    crs = 4326) %>%
+  st_transform(crs = 3857)
+
+# maximum distance and temporal swath radius
+spatial_eps = 40*1000 # 40km in m
+temporal_eps = 2*60*60 # assume 20km/h = 2 hour in sec
+time_space_scale = spatial_eps/temporal_eps
+
+# coordinate object
+X = cbind(st_coordinates(hail_sf), as.numeric(hail_sf$BEGIN_DATE_TIME_PARSED) * time_space_scale)
+
+# remove missing coordinates 
+rows_to_remove = unique(which(is.na(X), arr.ind = TRUE)[,1])
+
+X_2 <- X[-rows_to_remove,]
+hail_sf_2 <- hail_sf[-rows_to_remove,]
+
+# clustering using dbscan
+swaths <- dbscan(x = X_2, eps = spatial_eps, minPts = 3)
+
+# swath ids
+hail_sf_2$swath_id <- ifelse(
+  swaths$cluster == 0,
+  paste0("solo_", seq_len(sum(swaths$cluster == 0))),
+  paste0("swath_", swaths$cluster)
+)
+
+rand <- hail_sf_2 %>% 
+  filter(substr(swath_id, 1, 5) == "swath") %>%
+  .$swath_id %>% 
+  unique() %>% 
+  sample(size = 100)
+
+#  swath polygons --> plot
+swath_polys <- hail_sf_2 %>%
+  filter(swath_id %in% rand) %>% 
+  group_by(swath_id) %>%
+  summarise(
+    n_reports = n(),
+    geometry = st_combine(geometry) |> st_convex_hull()
+  ) %>%
+  ungroup()
+
+us_map <- ne_states(country = "united states of america", returnclass = "sf") %>% 
+  st_transform(crs = 3857)
+
+plt <- ggplot() +
+  geom_sf(data = us_map, fill = "gray80") +
+  geom_sf(data = swath_polys, aes(fill = n_reports), color = "black", alpha = 0.4) +
+  geom_sf(data = filter(hail_sf_2, swath_id %in% rand), color = "red", size = 0.5) +
+  scale_fill_viridis_c(option = "plasma") +
+  theme_minimal() +
+  labs(title = "DBSCAN-Detected Hail Swaths", fill = "# Reports")
+
+ggplotly(plt)
+
+# distribution of swath times and distances
+st_crs(hail_sf_2)
+
+max_dist_haversine <- function(geometry) {
+  coords <- st_coordinates(geometry)
+  
+  # Compute convex hull
+  hull_pts <- coords[chull(coords), ]
+  
+  # Compute pairwise haversine distances (in meters)
+  max(distm(hull_pts, fun = distHaversine))
+}
+
+plt_data <- hail_sf_2 %>% 
+  filter(substr(swath_id, 1, 5) == "swath") %>% 
+  st_transform(crs = 4326) %>% 
+  group_by(swath_id) %>% 
+  summarise(max_dist_m = max_dist_haversine(geometry),
+            max_time_m = (max(as.numeric(BEGIN_DATE_TIME_PARSED)) - min(as.numeric(BEGIN_DATE_TIME_PARSED)))/60)
+
+plt_data %>% 
+  mutate(max_dist_km = max_dist_m/1000) %>% 
+  select(-max_dist_m) %>% 
+  pivot_longer(cols = c("max_dist_km", "max_time_m"), names_to = "var", values_to = "value") %>%
+  ggplot() +
+  geom_boxplot(aes(y = value, group = var, x = var)) +
+  theme_minimal() +
+  labs(title = "Max swath distances along time and spatial axis")
+
+# create final file for export
+hail_swaths1 <- hail_sf_2 %>%
+  filter(substr(swath_id, 1, 5) == "swath") %>% 
+  group_by(swath_id) %>%
+  summarise(
+    nodes = n(),
+    MIN_DATETIME = min(BEGIN_DATE_TIME_PARSED),
+    MAX_DATETIME = max(BEGIN_DATE_TIME_PARSED),
+    MAGNITUDE = max(MAGNITUDE),
+    geometry = st_combine(geometry) |> st_convex_hull()) %>%
+  ungroup()
+
+hail_swaths2 <- hail_sf_2 %>%
+  filter(substr(swath_id, 1, 5) != "swath") %>%   
+  mutate(
+    nodes = 1,
+    MIN_DATETIME = BEGIN_DATE_TIME_PARSED,
+    MAX_DATETIME = BEGIN_DATE_TIME_PARSED) %>% 
+  select(swath_id, nodes, MIN_DATETIME, MAX_DATETIME, MAGNITUDE, geometry)
+
+hail_swaths <- hail_swaths1 %>% 
+  rbind(hail_swaths2)
+
+saveRDS(hail_swaths, file = "../data/hail_swaths.rds")
+rm(list = c("hail_sf", "hail_sf_2", "hail_swaths1", "hail_swaths2", 
+            "plt_data", "swath_polys", "swaths", "us_map", "X", "X_2"))
+
+# ---- Wildfire ----
+fire <- noaa %>% 
+  filter(EVENT_TYPE == "Wildfire")
+
+# we will merge by county to solar lookup, so we need to ensure county names are fungible
+names_noaa <- fire %>% 
+  select(STATE, CZ_NAME) %>% 
+  mutate(state = tolower(STATE),
+         county = tolower(CZ_NAME)) %>% 
+  distinct(state, county)
+
+state_code_to_name <- function(code) {
+  match_idx <- match(toupper(code), state.abb)
+  state.name[match_idx]
+}
+
+names_sf <- us_solar %>% 
+  select(p_state, p_county) %>% 
+  mutate(state = tolower(state_code_to_name(p_state)),
+         county = tolower(p_county)) %>% 
+  distinct(state, county)
+
+missing <- names_sf %>% 
+  anti_join(names_noaa, by = c("state", "county"))
+
+state = c(); county = c(); matching = c()
+for (i in 1:nrow(missing)) {
+  temp = grep(missing$county[i], filter(names_noaa, 
+                                             state == missing$state[i])$county, value = TRUE)
+  matching = c(matching, temp)
+  state = c(state, rep(missing$state[i], length(temp)))
+  county = c(county, rep(missing$county[i], length(temp)))
+}
+
+grep_search <- tibble(state, county, matching)
+
+# select rows to remove from grep_search
+to_remove = c(1, 2, 10, 11, 12, 14, 15, 32, 33, 34, 35, 75, 79)
+
+grep_search_final <- grep_search[-to_remove,]
+
+# search mapping for export
+noaa_county_mapping <- names_sf %>% 
+  semi_join(names_noaa, by = c("state", "county")) %>% 
+  mutate(matching = county) %>% 
+  rbind(grep_search_final)
+
+saveRDS(noaa_county_mapping, file = "../data/noaa_county_mapping.rds")
+saveRDS(fire, file = "../data/fire_events.rds")
+
+rm(list = c("grep_search", "grep_search_final", "missing", "names_noaa", "names_sf", "noaa"))
