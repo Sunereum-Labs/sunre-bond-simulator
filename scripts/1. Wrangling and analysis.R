@@ -734,7 +734,7 @@ for (i in 1:length(vars)) {
 }
 
 triggers <- tibble(var = vars, `1n2` = N_2, `1n5` = N_5, n = n)
-write_csv(triggers, "contract_triggers.csv")
+write_csv(triggers, "../data/contract_triggers.csv")
 
 
 # calculate expected premiums
@@ -846,8 +846,12 @@ tz_lookup <- c(
 
 noaa <- noaa %>% 
   mutate(BEGIN_DATE_TIME_PARSED = dmy_hms(BEGIN_DATE_TIME),
+         END_DATE_TIME_PARSED = dmy_hms(END_DATE_TIME),
          TZONE = tz_lookup[CZ_TIMEZONE],
          BEGIN_DATE_TIME_PARSED = force_tzs(time = BEGIN_DATE_TIME_PARSED, 
+                                            tzones = TZONE,
+                                            tzone_out = "UTC"),
+         END_DATE_TIME_PARSED = force_tzs(time = END_DATE_TIME_PARSED, 
                                             tzones = TZONE,
                                             tzone_out = "UTC"))
 
@@ -869,7 +873,7 @@ time_space_scale = spatial_eps/temporal_eps
 # coordinate object
 X = cbind(st_coordinates(hail_sf), as.numeric(hail_sf$BEGIN_DATE_TIME_PARSED) * time_space_scale)
 
-# remove missing coordinates 
+# remove missing coordinates (broken coordinates that don't have a geometry mapping in CRS 3857)
 rows_to_remove = unique(which(is.na(X), arr.ind = TRUE)[,1])
 
 X_2 <- X[-rows_to_remove,]
@@ -1021,3 +1025,236 @@ saveRDS(noaa_county_mapping, file = "../data/noaa_county_mapping.rds")
 saveRDS(fire, file = "../data/fire_events.rds")
 
 rm(list = c("grep_search", "grep_search_final", "missing", "names_noaa", "names_sf", "noaa"))
+
+
+# ---- Hurricane ----
+# Grab Atlantic and Pacific HURDAT2 data from https://www.nhc.noaa.gov/data/ and read it in
+atlantic <- read_fwf("../data/hurdat2-1851-2024-040425.txt")
+pacific <- read_fwf("../data/hurdat2-nepac-1949-2024-031725.txt")
+
+hurricane <- atlantic %>% 
+  rbind(pacific)
+
+# requires a bit of cleaning - let's pull hurricane IDs from the left-most row, make sure there are no duplicate sets
+hurricane %>% 
+  filter(is.na(X2)) %>% 
+  group_by(X1) %>% 
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  View()
+
+# clean hurricane
+hurricane <- hurricane %>% 
+  # get rid of header rows and assign swath ids to each hurricane
+  mutate(ID = if_else(is.na(X2), X1, NA),
+         is_header = !is.na(ID),
+         swath_id = cumsum(is_header)) %>% 
+  filter(is_header == FALSE) %>% 
+  select(-ID, -is_header) %>% 
+  # remove commas from values
+  mutate(across(everything(), ~ gsub(",", "", .))) %>% 
+  # create datetime
+  mutate(date_time = ymd_hm(paste0(X1, " ", X2))) %>% 
+  # parse latitude and system status
+  mutate(status = substr(X4, 1, 2),
+         lat = substr(X4, 4, 1000)) %>% 
+  select(swath_id, date_time, status, lat, X5, everything()) %>% 
+  select(-X1, -X2, -X4)
+
+# grab colnames from metadata https://www.nhc.noaa.gov/data/hurdat/hurdat2-format-atl-1851-2021.pdf
+colnames(hurricane) <- c("swath_id", "date_time", "status", "lat", "lon",
+                         "record_identifier", "max_sustained_speed", "min_pressure",
+                         "ne_radii_34kt", "se_radii_34kt", "sw_radii_34kt", "nw_radii_34kt",
+                         "ne_radii_50kt", "se_radii_50kt", "sw_radii_50kt", "nw_radii_50kt",
+                         "ne_radii_64kt", "se_radii_64kt", "sw_radii_64kt", "nw_radii_64kt",
+                         "max_radii")
+
+# unit changes
+hurricane <- hurricane %>%
+  # convert nautical miles to km
+  mutate(across(min_pressure:max_radii, ~ if_else(. == "-999", NA, as.numeric(.)))) %>% 
+  mutate(across(ne_radii_34kt:max_radii, ~ .*1.852)) %>% 
+  # convert lat and lon to decimal degrees
+  mutate(lat = case_when(substr(lat, nchar(lat), nchar(lat)) == "S" ~ as.numeric(substr(lat, 1, nchar(lat)-1)) * - 1,
+                         TRUE ~ as.numeric(substr(lat, 1, nchar(lat)-1))),
+         lon = case_when(substr(lon, nchar(lon), nchar(lon)) == "W" ~ as.numeric(substr(lon, 1, nchar(lon)-1)) * - 1,
+                         TRUE ~ as.numeric(substr(lon, 1, nchar(lon)-1))))
+
+# let's look at the proportion of NAs of radii column
+hurricane %>% 
+  select(min_pressure:max_radii) %>% 
+  pivot_longer(everything(), names_to = "var", values_to = "value") %>% 
+  group_by(var) %>% 
+  summarise(n = n(),
+            n_nas = sum(is.na(value)),
+            perc_nas = n_nas/n) %>% 
+  ungroup() %>% 
+  select(var, perc_nas) %>% 
+  pivot_wider(names_from = var, values_from = perc_nas) %>% 
+  View()
+
+# proportion of 0s of radii column
+hurricane %>% 
+  select(min_pressure:max_radii) %>% 
+  pivot_longer(everything(), names_to = "var", values_to = "value") %>% 
+  group_by(var) %>% 
+  summarise(n = n(),
+            n_0s = sum(value == 0, na.rm = TRUE),
+            perc_0s = n_0s/n) %>% 
+  ungroup() %>% 
+  select(var, perc_0s) %>% 
+  pivot_wider(names_from = var, values_from = perc_0s) %>% 
+  View()
+
+# impute 0s as NAs which are quite common but not likely in quandrant radii columns
+hurricane <- hurricane %>% 
+  mutate(across(ne_radii_34kt:nw_radii_64kt, ~ na_if(., 0)))
+
+# now let's find system level and swath means for radii -- we are only interested in 34kt
+radii_50kt_means <- hurricane %>% 
+  select(status, ne_radii_50kt:nw_radii_50kt) %>% 
+  pivot_longer(cols = ne_radii_50kt:nw_radii_50kt, names_to = "var", values_to = "value") %>% 
+  filter(!is.na(value)) %>% 
+  group_by(status) %>% 
+  summarise(n = n(),
+            ave = mean(value),
+            min = min(value),
+            max = max(value)) %>% 
+  ungroup()
+
+radii_50kt_swath_means <- hurricane %>% 
+  select(swath_id, ne_radii_50kt:nw_radii_50kt) %>% 
+  pivot_longer(cols = ne_radii_50kt:nw_radii_50kt, names_to = "var", values_to = "value") %>% 
+  filter(!is.na(value)) %>% 
+  group_by(swath_id) %>% 
+  summarise(ave = mean(value)) %>% 
+  ungroup()
+
+# (sub)tropical cyclone of (sub)tropical depression intensity (SD/TD) are below 34kt by definition - we remove these
+# also remove WV, DB which aren't well defined at 50kt
+hurricane <- hurricane %>% 
+  filter(!(status %in% c("TD", "SD", "WV", "DB"))) %>%
+  select(-c(ne_radii_34kt:nw_radii_34kt, ne_radii_64kt:nw_radii_64kt))
+
+# replace radii NAs
+hurricane <- hurricane %>%
+  # 1: take tangential radii values for each observation
+  mutate(ne_radii_50kt = case_when(!is.na(ne_radii_50kt) ~ ne_radii_50kt,
+                                   !is.na(nw_radii_50kt) & !is.na(se_radii_50kt) ~ 
+                                     rowMeans(across(c(nw_radii_50kt, se_radii_50kt))),
+                                   TRUE ~ NA),
+         se_radii_50kt = case_when(!is.na(se_radii_50kt) ~ se_radii_50kt,
+                                   !is.na(ne_radii_50kt) & !is.na(sw_radii_50kt) ~ 
+                                     rowMeans(across(c(ne_radii_50kt, sw_radii_50kt))),
+                                   TRUE ~ NA),
+         sw_radii_50kt = case_when(!is.na(sw_radii_50kt) ~ sw_radii_50kt,
+                                   !is.na(se_radii_50kt) & !is.na(nw_radii_50kt) ~ 
+                                     rowMeans(across(c(se_radii_50kt, nw_radii_50kt))),
+                                   TRUE ~ NA),
+         nw_radii_50kt = case_when(!is.na(nw_radii_50kt) ~ nw_radii_50kt,
+                                   !is.na(sw_radii_50kt) & !is.na(ne_radii_50kt) ~ 
+                                     rowMeans(across(c(sw_radii_50kt, ne_radii_50kt))),
+                                   TRUE ~ NA)) %>%
+  # 2: take a mean of any row-wise values available
+  mutate(ne_radii_50kt = case_when(is.na(ne_radii_50kt) ~ 
+                                     rowMeans(across(c(se_radii_50kt, sw_radii_50kt, nw_radii_50kt)), na.rm = TRUE),
+                                   TRUE ~ ne_radii_50kt),
+         se_radii_50kt = case_when(is.na(se_radii_50kt) ~ 
+                                    rowMeans(across(c(ne_radii_50kt, sw_radii_50kt, nw_radii_50kt)), na.rm = TRUE),
+                                   TRUE ~ se_radii_50kt),
+         sw_radii_50kt = case_when(is.na(sw_radii_50kt) ~
+                                    rowMeans(across(c(ne_radii_50kt, se_radii_50kt, nw_radii_50kt)), na.rm = TRUE),
+                                   TRUE ~ sw_radii_50kt),
+         nw_radii_50kt = case_when(is.na(nw_radii_50kt) ~
+                                    rowMeans(across(c(ne_radii_50kt, se_radii_50kt, sw_radii_50kt)), na.rm = TRUE),
+                                   TRUE ~ nw_radii_50kt)) %>% 
+  # 3: join on swath level means
+  ungroup() %>% 
+  left_join(radii_50kt_swath_means, by = "swath_id") %>% 
+  mutate(across(ne_radii_50kt:nw_radii_50kt, ~ coalesce(., ave))) %>% 
+  select(-ave) %>% 
+  # 4: join on system level means
+  left_join(select(radii_50kt_means, status, ave), by = "status") %>% 
+  mutate(across(ne_radii_50kt:nw_radii_50kt, ~ coalesce(., ave))) %>% 
+  select(-ave)
+
+# create a point for each radii adjustment
+hurricane_sf <- hurricane %>% 
+  pivot_longer(cols = ne_radii_50kt:nw_radii_50kt, names_to = "quadrant", values_to = "radii") %>% 
+  mutate(quadrant = substr(quadrant, 1, 2),
+         radii = radii * 1000,
+         bearing = case_when(quadrant == "ne" ~ 45,
+                             quadrant == "se" ~ 135,
+                             quadrant == "sw" ~ 225,
+                             quadrant == "nw" ~ 315))
+
+lon_new = c(); lat_new = c()
+for (i in 1:nrow(hurricane_sf)) {
+  temp = destPoint(p = c(hurricane_sf$lon[i], 
+                         hurricane_sf$lat[i]), 
+                   b = hurricane_sf$bearing[i], 
+                   d = hurricane_sf$radii[i])
+  
+  lon_new = c(lon_new, temp[1])
+  lat_new = c(lat_new, temp[2])
+}
+
+hurricane_sf$lat_shift <- lat_new
+hurricane_sf$lon_shift <- lon_new
+
+# create convex hull
+hurricane_sf <- hurricane_sf %>% 
+  select(-lat, -lon) %>% 
+  rename("lat" = lat_shift, "lon" = lon_shift) %>% 
+  rbind(
+    mutate(
+      distinct(
+        select(hurricane_sf, -lat_shift, -lon_shift, -quadrant, -radii, -bearing)
+      ),
+      quadrant = "",
+      radii = 0,
+      bearing = 0
+      )
+    ) %>% 
+  arrange(swath_id, date_time) %>% 
+  st_as_sf(coords = c("lon","lat"),
+           crs = 4326) %>%
+  st_transform(crs = 3857)
+
+hurricane_swaths <- hurricane_sf %>% 
+  group_by(swath_id) %>% 
+  summarise(begin_datetime = min(date_time),
+         end_datetime = max(date_time),
+         geometry = st_combine(geometry) |> st_convex_hull()) %>% 
+  ungroup()
+
+# plot some of the hurricane swaths
+us_map <- ne_states(country = "united states of america", returnclass = "sf") %>% 
+  st_transform(crs = 3857)
+
+rand_swaths <- sample(1500:max(hurricane$swath_id), size = 15) # visualise recent hurricanes
+
+plt_data1 <- hurricane_swaths %>% 
+  filter(swath_id %in% rand_swaths) %>% 
+  mutate(swath_id = as.factor(swath_id))
+
+plt_data2 <- hurricane_sf %>% 
+  filter(swath_id %in% rand_swaths & 
+           quadrant == "") %>% 
+  mutate(swath_id = as.factor(swath_id))
+
+plt <- ggplot() +
+  geom_sf(data = us_map, fill = "gray80") +
+  geom_sf(data = plt_data1, aes(color = swath_id), alpha = 0.4) +
+  geom_sf(data = plt_data2, aes(color = swath_id), size = 0.5) +
+  scale_fill_viridis_c(option = "plasma") +
+  theme_minimal() +
+  labs(title = "HURDAT2 Hurricane/Cyclone Swaths")
+
+ggplotly(plt)
+
+# export
+saveRDS(hurricane_swaths, file = "../data/hurricane_swaths.rds")
+rm(list = c("pacific", "atlantic", "hurricane", "radii_50kt_means", "radii_50kt_swath_means",
+            "lat_new", "lon_new","plt_data1", "plt_data2", "plt", "us_map"))
