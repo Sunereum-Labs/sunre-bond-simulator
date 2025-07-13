@@ -44,10 +44,12 @@ Each simulation year is an intra-year time-dependent Markov Chain but inter-year
 Effectively, the portfolio is "reset" every year (capital restored and profits taken); each year of simulation is independent of eachother.
 This allows for the capturing of intra-year depedent risks but disaggregates inter-year correlations/clusters of risks.
 This decision and protocal design choice aligns with the liquid and short-duration nature of Web3 financial products.
+Portfolios are randomly selected subject to user input variables such as state(s), min and max solar farm AC MW size, number of assets, etc.
+Selection of specific assets is easily configurable in the code-base down the road when required. 
 The simulator runs _m_ portfolio iterations containing _n_ assets over _y_ historical weather years.
 This creates _m_ x _n_ x _y_ datapoints of risk.
 
-Details on protocol design, data sources, augmentations and assumptions on Notion: https://www.notion.so/Refiant-Simulator-1ecdd598bdb480939e38ff1098cdc9a9
+Details on protocol design, data sources, augmentations and assumptions, and US solar sites on Notion: https://www.notion.so/Refiant-Simulator-1ecdd598bdb480939e38ff1098cdc9a9
 
 ## Running the Simulator
 
@@ -60,10 +62,33 @@ The latest R can be downloaded from: https://cloud.r-project.org/
 Optional R Studio IDE: https://posit.co/downloads/
 
 This program requires _Tidyverse_, _Geosphere_ and _SF_ packages to run. 
-These can be installed from the top of the RUN SIMULATION.R script:
+These are commented out at the top of the RUN SIMULATION.R script:
 ```r
 install.packages("tidyverse")
 install.packages("geosphere")
 install.packages("sf")
+```
+*Packages only need to be installed the first time*
+
+### Protocol Set Up
+In RUN SIMULATION.R, `refiant_sim()` will call on the program to run the simulation. 
+Any individual or combinations of variables is settable in the following list of arguments in `refiant_sim()` (default values shown):
+```r
+refiant_sim(seed = 100, # sets seed for random asset selection and investment returns
+            iter = 20, # number of random portfolios to iterate over (m)
+            wy = 1955:2023, # vector of weather years
+            CAR = 1, # capital-adequacy-ratio, e.g. CAR = 0.2 => $0.2 of capital for every $1 of risk 
+            L1_ratio = 0, # proportion of capital in L1
+            states = c("NY"), # state(s) to draw insured assets from
+            n_assets = 10, # number of insured assets in a portfolio
+            sf_ac_min = 0, # minimum MW size of an insured asset
+            sf_ac_max = 10000, # maximum MW size of an insured asset
+            fy = 2022, # financial year for treasury, S&P returns and USD/ETH
+            eth_float = 0, # USD/ETH basis risk flag, if 0 then the portfolio is basis hedged (e.g. holding USDT instead of ETH)
+            R_mu = log(0.06), # L1 staking yield is drawn from LN(mu, sigma^2)
+            R_sigma = sqrt(log(1+0.03^2/0.06^2)), # L1 staking yield drawn from LN(mu, sigma^2)
+            S_lambda = 0.002, # L1 probability of slashing drawn from Pois(lambda)
+            G_alpha = 2, # L1 size of a slash drawn from Beta(alpha, beta)
+            G_beta  = 5) # L1 size of a slash drawn from Beta(alpha, beta)
 ```
 
