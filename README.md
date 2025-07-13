@@ -119,7 +119,44 @@ Notably, these are 10 asset portfolios in the state of New York run over all wea
 The protocol assumes all capital in L2 (i.e. everything is held in USD) and receives a yield from a treasury and the S&P.
 Capital adequacy ratio is 1, we hold $1 of capital for every $1 of risk we underwrite.
 
-![Simulation Example](example_simulation/example.jpeg)
+![Simulation Example](example_simulation/example.jpg) <br>
+This example iteration-year is relatively mild with only a single claim partway through the way.
+From premium and investment return, the protocol makes >50% in this year.
+
+![Portfolio Annual Returns](example_simulation/returns.jpg) <br>
+L1 isn't utilised in this set-up so we can ignore the top plot.
+Yearly iteration-year returns are varied with some years extremely profitable (many multiple years with returns >50%) and others making significant losses.
+As premium is set to the entire multi-year weather series for each porfolio, the degree of spread here indicates how correlated risks are and how diversified the portfolio is.
+A high variance in annual returns is unsurprising given the portfolios are not well diversified by construction, with all 10 assets located in the state of New York.
+
+![Portfolio Returns accross Weather Years](example_simulation/returns_year.jpg) <br>
+This plot tells how financial performance for a given weather year varies across portfolio iterations.
+We observe low variance in any given year's outcomes - high yielding years remain high yielding regardless of the portfolio composition and vice versa for loss-making years.
+This suggests that assets are not well diversified across the state of New York, perhaps compared to larger states or multi-state portfolios.
+
+![Percentage of Solvent Years](example_simulation/insolvency.jpg) <br>
+The x-axis here tells us the percentage of solvent weather years for each portfolio. 
+The y-axis gives us a count of portfolios at each level of aggregate solvency.
+Generally, the protocol does well here, likely owing to it's strong capital adequacy (`CAR = 1`).
+The worst portfolio is solvent in 90% of weather years and most portfolios are solvent more than 95% of weather years.
+
+![Portfolio Annual Returns](example_simulation/insolvency_year.jpg) <br>
+Pivoting the solvency data this way, we can see which weather years consistently perform poorly across porfolio combinations.
+1979, for example, creates insolvency in the protocol in more than 80% of portfolios tests.
+This clustering suggests that the set-up (10 assets, state of New York, etc) is exposed to particular patterns of weather.
+2020 and 2021 are both problematic years, which would create significant risks for this insurance protocol.
+
+![Portfolio Diversification versus Solvency](example_simulation/insolvency_sdi.jpg) <br>
+`SDI` is a simple metric that informs diversity across distance for assets in the portfolio.
+
+![Distribution of Annual Claims](example_simulation/claims.jpg) <br>
+The maximum number of claims in a year is 25 from 10 insured assets and approximately 40% of years experience no claims.
+This lumpy claims distribution underpins lumpiness in portfolio returns observed above.
+
+![Distribution of Annual Claims across Weather Year](example_simulation/claims_year.jpg) <br>
+The number of claims in a given weather year is well correlated across portfolios, generally with bad years remaining bad and good years (or even no claim years) remaining this away across portfolios.
+Interestingly, though we do see high variance in 2007, 2011, 2020 and 2021, suggesting that specific portfolio risk selection in _these_ years may be important.
+
 
 
 
