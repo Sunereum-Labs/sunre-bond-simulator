@@ -119,7 +119,7 @@ Notably, these are 10 asset portfolios in the state of New York run over all wea
 The protocol assumes all capital in L2 (i.e. everything is held in USD) and receives a yield from a treasury and the S&P.
 Capital adequacy ratio is 1, we hold $1 of capital for every $1 of risk we underwrite.
 
-![Simulation Example](example_simulation/plt_example.jpeg)
+![Simulation Example](example_simulation/example.jpeg)
 
 
 
