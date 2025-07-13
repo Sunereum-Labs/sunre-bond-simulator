@@ -116,11 +116,31 @@ refiant_sim <- function(
         L1_insolvency[i+1] = I(L1[i+1] < 0)*1
       }
       
-      output_L2_return[j] = L2[length(L2)]/(L2[1]+1e-10) - 1
-      output_L1_return[j] = L1[length(L1)]/(L1[1]+1e-10) - 1
+      output_L2_return[j] = 
+        if (L1_ratio < 1 & CAR > 0) {
+          L2[length(L2)]/(L2[1]) - 1
+        } else {
+            0
+        }
+      output_L1_return[j] = 
+        if (L1_ratio > 0 & CAR > 0) {
+          L1[length(L1)]/(L1[1]) - 1
+        } else {
+          0
+        }
       
-      output_L2_insolvent[j] = I(sum(L2_insolvency) > 0)*1
-      output_L1_insolvent[j] = I(sum(L1_insolvency) > 0)*1
+      output_L2_insolvent[j] = 
+        if (L1_ratio < 1 & CAR > 0) {
+          I(sum(L2_insolvency) > 0)*1
+        } else {
+          0
+        }
+      output_L1_insolvent[j] = 
+        if (L1_ratio > 0 & CAR > 0) {
+          I(sum(L1_insolvency) > 0)*1
+        } else {
+          0
+        }
       
       output_claims[j] = sum(j_simulation$claims)
       output_wind[j] = sum(j_simulation$GUST)
@@ -150,22 +170,24 @@ refiant_sim <- function(
       output <<- output %>% 
         rbind(temp)
     }
+    
+    # sample year timeseries
+    if (sum(j_simulation$claims) >= 1) {
+      plt_example <<- tibble(Year = wy[j],
+                             L1 = L1,
+                             L2 = L2,
+                             claims = c(0, j_simulation$claims)) %>% 
+        mutate(index = row_number(),
+               claims = ifelse(claims > 0, claims, NA)) %>% 
+        pivot_longer(cols = c(L1, L2), names_to = "Pool", values_to = "value") %>% 
+        ggplot() +
+        theme_minimal() +
+        geom_line(aes(x = index, y = value, color = Pool)) +
+        geom_point(aes(x = index, y = claims)) +
+        labs(x = "Day of year", y = "$", title = paste0("Iteration ", m, ", Weather Year ", wy[j])) +
+        theme(legend.position = "bottom")
+    }
   }
-  
-  # sample year timeseries
-  plt_example <<- tibble(Year = wy[j],
-                        L1 = L1,
-                        L2 = L2,
-                        claims = c(0, j_simulation$claims)) %>% 
-    mutate(index = row_number(),
-           claims = ifelse(claims > 0, claims, NA)) %>% 
-    pivot_longer(cols = c(L1, L2), names_to = "Pool", values_to = "value") %>% 
-    ggplot() +
-    theme_minimal() +
-    geom_line(aes(x = index, y = value, color = Pool)) +
-    geom_point(aes(x = index, y = claims)) +
-    labs(x = "Day of year", y = "$", title = paste0("Iteration ", m, ", Weather Year ", wy[j])) +
-    theme(legend.position = "bottom")
   
   # returns distribution
   plt_returns <<- output %>% 
