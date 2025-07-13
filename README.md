@@ -7,7 +7,6 @@ By focussing on the physical element of natural catastrophe insurance, SunRE REF
 As such, SunRE REFI narrows the scope of a highly complex and technically challenging insurance underwriting problem. 
 This allows the protocol to leverage highly liquid Web3 markets, emergent capital and smart contract technology, and provide a scalable solution for asset owners, insurance captives, reinsurance and mutuals alike.
 
-//
 
 ## Simulator Structure and Features
 The simulator takes publically available historical weather, geography and physics data to simulate claims for any portfolio of solar farm assets across the mainland United States and Hawaii. 
@@ -17,8 +16,6 @@ Perils covered currently include:
 - Wildfire (payout when a wildfire crosses into the insured asset's county)
 - Hurricane (payout when >= 50 kt windspeeds of a hurricane overlaps with the insured asset)
 - Hail (payout when hail swath with maximum hail stone size >= 1.75 ins overaps with the insured asset)
-  
-//
 
 The protocol defends it's solvency through structured pools of capital. 
 These pools receive capital injections through premium and capital investment returns, and leakages through claims (when trigger conditions occur) and investment losses. 
@@ -32,8 +29,6 @@ L2 will only be called on to payout claims once L1 becomes insolvent.
 Where L1 is subject to USD/ETH basis risk, the end-of-day spot exchange rate is used to move capital between the two pools.
 No transaction fees of exchange or purchase/liquidation of investment assets is assumed.
 For simplicity and at this initial stage, L1 transfers premium to L2 for reinsurance proportional to total protocol capital contributed.
-
-//
 
 Premium is calculated for a given portfolio of risks as the expected value of claims over the entire multi-year simulation paid nominally, and uniformly each day (ignores discounting and inflation).
 The integration of an actuarial premium model when available would add significant value to this simulation, especially in the simulation of protocol returns.
