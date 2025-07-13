@@ -7,7 +7,6 @@ By focussing on the physical element of natural catastrophe insurance, SunRE REF
 As such, SunRE REFI narrows the scope of a highly complex and technically challenging insurance underwriting problem. 
 This allows the protocol to leverage highly liquid Web3 markets, emergent capital and smart contract technology, and provide a scalable solution for asset owners, insurance captives, reinsurance and mutuals alike.
 
-
 ## Simulator Structure and Features
 The simulator takes publically available historical weather, geography and physics data to simulate claims for any portfolio of solar farm assets across the mainland United States and Hawaii. 
 These claims occur via single-variable weather triggers from a simulated data-oracle collecting data for each solar farm site.
@@ -34,13 +33,10 @@ Premium is calculated for a given portfolio of risks as the expected value of cl
 The integration of an actuarial premium model when available would add significant value to this simulation, especially in the simulation of protocol returns.
 The simulator code-base would easily incorporate the deployment of an exogenous premium model when there is one available.
 
-//
-
 The simulator has also been designed to incorporate more complete, robust and detailed natural peril datasets when available.
 Currently, simulation can be run on historical weather years spanning 1955-2023.
 The incorporation of more historical data or propiertary forecast data would allow for a greater depth of empirical simulation.
 
-//
 The goal of the simulator is to empirically test solvency and yield on capital for different portfolios of insured assets, and protocol configurations.
 This is akin to monte carlo simulation used to construct probability distributions in complex, multi-variate probability problems; and common in short-tail insurance modelling.
 The simulator operates in discrete daily time steps, with premium received and claims paid out at the end of each day after the realisation of investment returns.
@@ -50,4 +46,24 @@ This allows for the capturing of intra-year depedent risks but disaggregates int
 This decision and protocal design choice aligns with the liquid and short-duration nature of Web3 financial products.
 The simulator runs _m_ portfolio iterations containing _n_ assets over _y_ historical weather years.
 This creates _m_ x _n_ x _y_ datapoints of risk.
-//
+
+Details on protocol design, data sources, augmentations and assumptions on Notion: https://www.notion.so/Refiant-Simulator-1ecdd598bdb480939e38ff1098cdc9a9
+
+## Running the Simulator
+
+### Requirements
+The simulator is built in and requires R to run.
+R and R packages are relatively robust compared to Python which typically requires specific Python and package versions to run modules.
+Any R >= 4.3.3 should work with this program.
+
+The latest R can be downloaded from: https://cloud.r-project.org/ 
+Optional R Studio IDE: https://posit.co/downloads/
+
+This program requires _Tidyverse_, _Geosphere_ and _SF_ packages to run. 
+These can be installed from the top of the RUN SIMULATION.R script:
+```r
+install.packages("tidyverse")
+install.packages("geosphere")
+install.packages("sf")
+```
+
