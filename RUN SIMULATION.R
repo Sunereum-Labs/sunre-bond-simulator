@@ -1,3 +1,7 @@
+# install.packages("tidyverse")
+# install.packages("geosphere")
+# install.packages("sf")
+
 source("./scripts/3. Simulation.R")
 
 refiant_sim()
