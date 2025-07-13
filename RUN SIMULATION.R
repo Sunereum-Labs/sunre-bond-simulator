@@ -1,10 +1,16 @@
-source("3. Simulation.R")
+source("./scripts/3. Simulation.R")
 
-refiant_sim(n_nodes = 100, iter = 10, p_ret = 0.1, event = 2, S_lambda = 0)
+refiant_sim()
 
 plt_example
-plt_returns + xlim(-100, 200)
-plt_returns_y + ylim(-100, 200)
-plt_returns_sdi + ylim(-200, 400)
-plt_insolvency_y
+
+plt_returns
+plt_returns_year + ylim(-100, 100)
+
+plt_insolvency
+plt_insolvency_year
+plt_insolvency_sdi
+
 plt_claims
+plt_claims_year
+plt_peril_year
