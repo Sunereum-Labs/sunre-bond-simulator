@@ -148,7 +148,22 @@ refiant_sim <- function(
       output_hail[j] = sum(j_simulation$hail)
       output_hurricane[j] = sum(j_simulation$hurricane)
       
-      
+      # sample year timeseries
+      if (sum(j_simulation$claims) >= 1) {
+        plt_example <<- tibble(Year = wy[j],
+                               L1 = L1,
+                               L2 = L2,
+                               claims = c(0, j_simulation$claims)) %>% 
+          mutate(index = row_number(),
+                 claims = ifelse(claims > 0, claims, NA)) %>% 
+          pivot_longer(cols = c(L1, L2), names_to = "Pool", values_to = "value") %>% 
+          ggplot() +
+          theme_minimal() +
+          geom_line(aes(x = index, y = value, color = Pool)) +
+          geom_point(aes(x = index, y = claims)) +
+          labs(x = "Day of year", y = "$", title = paste0("Iteration ", m, ", Weather Year ", wy[j])) +
+          theme(legend.position = "bottom")
+      }
     }
     
     temp <- tibble(year = wy,
@@ -169,23 +184,6 @@ refiant_sim <- function(
     } else {
       output <<- output %>% 
         rbind(temp)
-    }
-    
-    # sample year timeseries
-    if (sum(j_simulation$claims) >= 1) {
-      plt_example <<- tibble(Year = wy[j],
-                             L1 = L1,
-                             L2 = L2,
-                             claims = c(0, j_simulation$claims)) %>% 
-        mutate(index = row_number(),
-               claims = ifelse(claims > 0, claims, NA)) %>% 
-        pivot_longer(cols = c(L1, L2), names_to = "Pool", values_to = "value") %>% 
-        ggplot() +
-        theme_minimal() +
-        geom_line(aes(x = index, y = value, color = Pool)) +
-        geom_point(aes(x = index, y = claims)) +
-        labs(x = "Day of year", y = "$", title = paste0("Iteration ", m, ", Weather Year ", wy[j])) +
-        theme(legend.position = "bottom")
     }
   }
   
