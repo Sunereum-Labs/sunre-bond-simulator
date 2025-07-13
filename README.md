@@ -58,7 +58,7 @@ The simulator is built in and requires R to run.
 R and R packages are relatively robust compared to Python which typically requires specific Python and package versions to run modules.
 Any R >= 4.3.3 should work with this program.
 
-The latest R can be downloaded from: https://cloud.r-project.org/ 
+The latest R can be downloaded from: https://cloud.r-project.org/ <br>
 Optional R Studio IDE: https://posit.co/downloads/
 
 This program requires _Tidyverse_, _Geosphere_ and _SF_ packages to run. 
@@ -83,7 +83,7 @@ refiant_sim(seed = 100, # sets seed for random asset selection and investment re
             n_assets = 10, # number of insured assets in a portfolio
             sf_ac_min = 0, # minimum MW size of an insured asset
             sf_ac_max = 10000, # maximum MW size of an insured asset
-            fy = 2022, # financial year for treasury, S&P returns and USD/ETH
+            fy = 2022, # financial year for treasury, S&P returns and USD/ETH (can take values/ a vector with 2021-2024 incl.)
             eth_float = 0, # USD/ETH basis risk flag, if 0 then the portfolio is basis hedged (e.g. holding USDT instead of ETH)
             R_mu = log(0.06), # L1 staking yield is drawn from LN(mu, sigma^2)
             R_sigma = sqrt(log(1+0.03^2/0.06^2)), # L1 staking yield drawn from LN(mu, sigma^2)
@@ -91,4 +91,31 @@ refiant_sim(seed = 100, # sets seed for random asset selection and investment re
             G_alpha = 2, # L1 size of a slash drawn from Beta(alpha, beta)
             G_beta  = 5) # L1 size of a slash drawn from Beta(alpha, beta)
 ```
+
+### Simulation Results
+The simulator automaticallly generates a number of plots for results visualisation.
+These are call-able in the RUN SIMULATION.R script:
+```r
+plt_example # daily time series of 1 iteration-year
+
+# protocol yield
+plt_returns # monte carlo distribution of L1 and L2 yields
+plt_returns_year + ylim(-100, 100) # distribution of L1 and L2 yields by weather year
+
+plt_insolvency # monte carl distribution of L1 and L2 solvency
+plt_insolvency_year # distribution of insolvency by weather year
+plt_insolvency_sdi # protocol involency by geographic portfolio diversification
+
+plt_claims # distribution of number of yearly claims
+plt_claims_year # distribution of claims by weather year
+plt_peril_year # distribution of fire, hail, hurricane and wind claims by weather year
+```
+Results are also directly accessible in the `output` file.
+Each contains a single iteration year with L1 and L2 returns, solvency flags (i.e. did the pool go insolvent at any time in the year), number of claims and SDI.
+
+## Example Results and Interpretation
+The following results are from a simulation with default values.
+Notably, these are 10 asset portfolios in the state of New York run over all weather years 1955-2023.
+The protocol assumes all capital in L2 (i.e. everything is held in USD) and receives a yield from a treasury and the S&P.
+Capital adequacy ratio is 1, we hold $1 of capital for every $1 of risk we underwrite.
 
