@@ -8,19 +8,19 @@ As such, SunRE REFI narrows the scope of a highly complex and technically challe
 This allows the protocol to leverage highly liquid Web3 markets, emergent capital and smart contract technology, and provide a scalable solution for asset owners, insurance captives, reinsurance and mutuals alike.
 
 ## Simulator Structure and Features
-The simulator takes publically available historical weather, geography and physics data to simulate claims for any portfolio of solar farm assets across the mainland United States and Hawaii. 
+The simulator takes publicly available historical weather, geography and physics data to simulate claims for any portfolio of solar farm assets across the mainland United States and Hawaii. 
 These claims occur via single-variable weather triggers from a simulated data-oracle collecting data for each solar farm site.
 Perils covered currently include:
 - Wind/storm (payout to an insured asset when maximum daily wind speed >= 34 kt and < 50 kt)
 - Wildfire (payout when a wildfire crosses into the insured asset's county)
 - Hurricane (payout when >= 50 kt windspeeds of a hurricane overlaps with the insured asset)
-- Hail (payout when hail swath with maximum hail stone size >= 1.75 ins overaps with the insured asset)
+- Hail (payout when hail swath with maximum hail stone size >= 1.75 ins overlaps with the insured asset)
 
 The protocol defends it's solvency through structured pools of capital. 
 These pools receive capital injections through premium and capital investment returns, and leakages through claims (when trigger conditions occur) and investment losses. 
 Currently, there are two pools or _layers_ of capital.
 The first, layer 1 (L1), operates as a backstop or "last line of defence" in defending the solvency of the protocol.
-Comensurate with the protocol design, this fund is denominated in Ethereum, earns a staking yield and is subjected to (a historically marginal) slashing risk.
+Commensurate with the protocol design, this fund is denominated in Ethereum, earns a staking yield and is subjected to (a historically marginal) slashing risk.
 Layer 2 (L2), captive/insurance layer, directly interacts with insurance liabilities and pays claims to/receives premium directly from insured parties.
 L1 is USD denominated and invests capital in a combination of US treasury bonds and a S&P500 index fund.
 Effectively, L2 can thought of as a maximal loss reinsurance layer for L1, who's exposure is mediated by the amount of capital at risk (or maximal loss before insolvency) of L1.
@@ -35,15 +35,15 @@ The simulator code-base would easily incorporate the deployment of an exogenous 
 
 The simulator has also been designed to incorporate more complete, robust and detailed natural peril datasets when available.
 Currently, simulation can be run on historical weather years spanning 1955-2023.
-The incorporation of more historical data or propiertary forecast data would allow for a greater depth of empirical simulation.
+The incorporation of more historical data or proprietary forecast data would allow for a greater depth of empirical simulation.
 
 The goal of the simulator is to empirically test solvency and yield on capital for different portfolios of insured assets, and protocol configurations.
-This is akin to monte carlo simulation used to construct probability distributions in complex, multi-variate probability problems; and common in short-tail insurance modelling.
+This is akin to Monte Carlo simulation used to construct probability distributions in complex, multi-variate probability problems; and common in short-tail insurance modelling.
 The simulator operates in discrete daily time steps, with premium received and claims paid out at the end of each day after the realisation of investment returns.
 Each simulation year is an intra-year time-dependent Markov Chain but inter-year independent.
 Effectively, the portfolio is "reset" every year (capital restored and profits taken); each year of simulation is independent of eachother.
-This allows for the capturing of intra-year depedent risks but disaggregates inter-year correlations/clusters of risks.
-This decision and protocal design choice aligns with the liquid and short-duration nature of Web3 financial products.
+This allows for the capturing of intra-year dependent risks but disaggregates inter-year correlations/clusters of risks.
+This decision and protocol design choice aligns with the liquid and short-duration nature of Web3 financial products.
 Portfolios are randomly selected subject to user input variables such as state(s), min and max solar farm AC MW size, number of assets, etc.
 Selection of specific assets is easily configurable in the code-base down the road when required. 
 The simulator runs _m_ portfolio iterations containing _n_ assets over _y_ historical weather years.
@@ -93,7 +93,7 @@ refiant_sim(seed = 100, # sets seed for random asset selection and investment re
 ```
 
 ### Simulation Results
-The simulator automaticallly generates a number of plots for results visualisation.
+The simulator automatically generates a number of plots for results visualisation.
 These are call-able in the RUN SIMULATION.R script:
 ```r
 plt_example # daily time series of 1 iteration-year
@@ -104,7 +104,7 @@ plt_returns_year + ylim(-100, 100) # distribution of L1 and L2 yields by weather
 
 plt_insolvency # monte carl distribution of L1 and L2 solvency
 plt_insolvency_year # distribution of insolvency by weather year
-plt_insolvency_sdi # protocol involency by geographic portfolio diversification
+plt_insolvency_sdi # protocol insolvency by geographic portfolio diversification
 
 plt_claims # distribution of number of yearly claims
 plt_claims_year # distribution of claims by weather year
@@ -141,7 +141,7 @@ Generally, the protocol does well here, likely owing to it's strong capital adeq
 The worst portfolio is solvent in 90% of weather years and most portfolios are solvent more than 95% of weather years.
 
 ![Portfolio Annual Returns](example_simulation/insolvency_year.jpg) <br>
-Pivoting the solvency data this way, we can see which weather years consistently perform poorly across porfolio combinations.
+Pivoting the solvency data this way, we can see which weather years consistently perform poorly across portfolio combinations.
 1979, for example, creates insolvency in the protocol in more than 80% of portfolios tests.
 This clustering suggests that the set-up (10 assets, state of New York, etc) is exposed to particular patterns of weather.
 2020 and 2021 are both problematic years, which would create significant risks for this insurance protocol.
@@ -156,6 +156,45 @@ This lumpy claims distribution underpins lumpiness in portfolio returns observed
 ![Distribution of Annual Claims across Weather Year](example_simulation/claims_year.jpg) <br>
 The number of claims in a given weather year is well correlated across portfolios, generally with bad years remaining bad and good years (or even no claim years) remaining this away across portfolios.
 Interestingly, though we do see high variance in 2007, 2011, 2020 and 2021, suggesting that specific portfolio risk selection in _these_ years may be important.
+
+## How does the simulator work?
+1. Randomly sample a portfolio of _n_assets_ solar firms from _state_, between _sf_ac_min_ and _sf_ac_max_ MW.
+```r
+sim_sf <- solar_lookup %>% 
+  filter(p_state %in% states &
+           p_cap_ac >= sf_ac_min & p_cap_ac <= sf_ac_max) %>% 
+  .$case_id %>% 
+  sample(size = n_assets, replace = FALSE)
+```
+
+2. Find all natural peril trigger events for the sampled portfolio across the entire weather year series _wy_. See example for hail:
+```r
+# filter hail events that triggers a payout
+hail <- hail_swaths %>% 
+  # trigger on hail size 1.75ins
+  filter(MAGNITUDE >= 1.75) %>% 
+  st_transform(crs = 3857) %>% 
+  mutate(geometry = st_buffer(geometry, dist = 10000)) # add 10km buffer to hail swaths
+
+# find spatial overlap with assets
+hail_events <- st_intersects(solar_sf, hail, sparse = TRUE)
+```
+3. Calculate fair value premium for the portfolio.
+$$ P = \frac{1}{n}\summation_{peril}\summation_{asset}\text{I}(event_{peril, asset}), $$
+where $n$ is the total number of days across all weather years.
+
+4. Calculate L1 and L2 yield
+```r
+… mutate(R = rlnorm(nrow(.), meanlog = R_mu, sdlog = R_sigma), # L1 staking yield
+         S = rpois(nrow(.), S_lambda), # L1 capital slashed
+         G = rbeta(nrow(.), G_alpha, G_beta), # proportion of L1 capital slashed
+         Y = R/365 - S * G, # realised L1 staking yield
+         eta = runif(nrow(.), 0, 1), # proportion of L2 held as treasury bonds
+         I = eta * rf_ret + (1 - eta) * sp500_ret) # L2 investment yield
+```
+
+5. Calculate standardised diversity index (SDI)
+$$ SDI = \frac{(\summation_{asset} D(x_i, x_j))^2}{\summation_{asset} D(x_i, x_j)^2} \times \expectation{D(x_i, x_j)} $$
 
 
 
