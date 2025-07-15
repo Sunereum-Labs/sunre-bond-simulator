@@ -51,7 +51,8 @@ fire <- solar_lookup %>%
   select(case_id, p_state, p_county) %>% 
   mutate(noaa_state = tolower(state_code_to_name(p_state)),
          noaa_county = tolower(p_county)) %>% 
-  left_join(solar_noaa_county_mapping, by = c("noaa_state"="state", "noaa_county"="county")) %>% 
+  left_join(solar_noaa_county_mapping, by = c("noaa_state"="state", "noaa_county"="county"),
+            relationship = "many-to-many") %>% 
   select(case_id, noaa_state, matching) %>% 
   filter(!is.na(matching))
 
@@ -68,7 +69,8 @@ sim_fire_events <- fire_events %>%
 
 # re-summarise daily fire events by case_id
 sim_fire_events_join <- fire %>% 
-  left_join(sim_fire_events, by = c("noaa_state"="STATE", "matching"="CZ_NAME")) %>% 
+  left_join(sim_fire_events, by = c("noaa_state"="STATE", "matching"="CZ_NAME"),
+            relationship = "many-to-many") %>% 
   group_by(case_id, YEARMODA) %>% 
   summarise(fire = pmin(1, n())) %>% 
   ungroup()
