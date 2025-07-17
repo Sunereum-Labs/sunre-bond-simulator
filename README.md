@@ -199,7 +199,7 @@ where $n$ is the total number of days across all weather years.
 ```math
 SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \text{E[}D(x_i, x_j)\text{]}
 ```
-
+where $D$ is the Harverstine Distance between two assets, $i, j$.
 
 
 
