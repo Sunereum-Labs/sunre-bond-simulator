@@ -197,7 +197,7 @@ where $n$ is the total number of days across all weather years.
 
 5. Calculate standardised diversity index (SDI)
 ```math
-SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \EX{D(x_i, x_j)}
+SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \text{E[}D(x_i, x_j)\text{]}
 ```
 
 
