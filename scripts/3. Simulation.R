@@ -106,7 +106,8 @@ refiant_sim <- function(
       for (i in 1:nrow(j_simulation)) {
         
         L2[i+1] = L2[i] * (1 + j_simulation$I[i]) + j_simulation$P[i] * (1 - alpha) - j_simulation$claims[i]
-        L1[i+1] = L1[i] * (1 + j_simulation$Y[i]) + j_simulation$P[i] * alpha  + 
+        L1[i+1] = L1[i] * (1 + j_simulation$Y[i]) + 
+          j_simulation$P[i] * alpha * (j_simulation$eth_usd[i] * I(eth_float == 1)*1 + I(eth_float == 0)*1)  + 
           min(L2[i+1], 0) * ((j_simulation$eth_usd[1]/j_simulation$eth_usd[i] - 1) * 
                                         I(eth_float == 1)*1 + 1)
         
