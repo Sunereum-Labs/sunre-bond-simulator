@@ -181,7 +181,7 @@ hail_events <- st_intersects(solar_sf, hail, sparse = TRUE)
 ```
 3. Calculate fair value premium for the portfolio.
 ```math
-P = \frac{1}{n}\summation_{peril}\summation_{asset}\text{I}(event_{peril, asset}),
+P = \frac{1}{n}\sum_{peril}\sum_{asset}\text{I}(event_{peril, asset}),
 ```
 where $n$ is the total number of days across all weather years.
 
@@ -197,7 +197,7 @@ where $n$ is the total number of days across all weather years.
 
 5. Calculate standardised diversity index (SDI)
 ```math
-SDI = \frac{(\summation_{asset} D(x_i, x_j))^2}{\summation_{asset} D(x_i, x_j)^2} \times \expectation{D(x_i, x_j)}
+SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \EX{D(x_i, x_j)}
 ```
 
 
