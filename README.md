@@ -210,6 +210,7 @@ SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \te
             where $D$ is the Harverstine Distance between two assets, $i, j$.
 
 6. Calculate total notional value of bonds and capital requirements
+
             We assume we issue a $1 notional (single-trigger) bond per peril per asset.
             Therefore, the total notional value of porfolio risk per year is number of bonds issued.
             We only issue bonds for an asset for well defined peril risks.
