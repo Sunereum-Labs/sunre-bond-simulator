@@ -62,7 +62,7 @@ Any R >= 4.3.3 should work with this program.
 The latest R can be downloaded from: https://cloud.r-project.org/ <br>
 Optional R Studio IDE: https://posit.co/downloads/
 
-This program requires _Tidyverse_, _Geosphere_ and _SF_ packages to run. 
+This program requires `Tidyverse`, `Geosphere` and `sf` packages to run. 
 These are commented out at the top of the RUN SIMULATION.R script:
 ```r
 install.packages("tidyverse")
@@ -163,7 +163,7 @@ This plot looks at the occurance of claims by weather year for each peril class.
 
 ## How does the simulator work?
 Each portfolio iteration undergoes the following steps:
-1. Randomly sample a portfolio of _n_assets_ solar firms from _state_, between _sf_ac_min_ and _sf_ac_max_ MW.
+1. Randomly sample a portfolio of `n_assets` solar firms from _state_, between `sf_ac_min` and `sf_ac_max_ MW`.
 ```r
 sim_sf <- solar_lookup %>% 
   filter(p_state %in% states &
@@ -172,7 +172,7 @@ sim_sf <- solar_lookup %>%
   sample(size = n_assets, replace = FALSE)
 ```
 
-2. Find all natural peril trigger events for the sampled portfolio across the entire weather year series _wy_. See example for hail:
+2. Find all natural peril trigger events for the sampled portfolio across the entire weather year series `wy`. See example for hail:
 ```r
 # filter hail events that triggers a payout
 hail <- hail_swaths %>% 
@@ -210,7 +210,6 @@ SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \te
             where $D$ is the Harverstine Distance between two assets, $i, j$.
 
 6. Calculate total notional value of bonds and capital requirements
-
             We assume we issue a $1 notional (single-trigger) bond per peril per asset.
             Therefore, the total notional value of porfolio risk per year is number of bonds issued.
             We only issue bonds for an asset for well defined peril risks.
@@ -218,7 +217,8 @@ SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \te
 ```math
 \text{Total Bonds} = \sum_{asset}\sum_{peril}\text{I}(P_{asset, peril} > 0)
 ```
-            Capital is held against the total notional value of portfolio risk (total number of $1 bonds) and split across L1 and L2 layers with `L1_ratio`.
+            Capital is held against the total notional value of portfolio risk (total number of $1 bonds). 
+            Capital is then split across L1 and L2 layers with `L1_ratio`.
 ```math
 \text{Capital} = \text{Total Bonds} \times \text{Capital Adequacy Ratio}
 ```
@@ -257,5 +257,3 @@ Premium rates are merged on a per asset basis to the solar farm asset lookup tab
 ![Frequency of 34kt wind](premium/wind.jpg) <br>
 ![Frequency of wildfire](premium/fire.jpg) <br>
 ![Frequency of 64kt hurricane](premium/hurricane.jpg) <br>
-
-
