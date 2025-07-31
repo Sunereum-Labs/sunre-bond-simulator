@@ -6,7 +6,7 @@ library(sf)
 
 # load data and meta data
 prices <- readRDS("./data/financial_data.rds")
-solar_lookup <- read_csv("./data/solar_farm_lookup.csv")
+solar_lookup <- read_csv("./premium/solar_lookup_with_premium.csv")
 
 solar_gsod_lookup <- read_csv("./data/lfs/solar_stnid_lookup.csv")
 gsod_peril <- readRDS("./data/lfs/GSOD_peril.rds")
@@ -46,18 +46,19 @@ compute_DI_SDI <- function(lat, lon, metric = "SDI") {
   return(SDI)
 }
 
-refiant_sim <- function(
+sunrefi_sim <- function(
     seed = 100,
     iter = 20,
     wy = 1955:2023,
-    CAR = 1,
-    L1_ratio = 0,
-    states = c("NY"),
-    n_assets = 10,
+    CAR = 0.5,
+    loss_ratio = 0.5,
+    L1_ratio = 0.5,
+    states = c("NY", "AZ"),
+    n_assets = 20,
     sf_ac_min = 0,
-    sf_ac_max = 10000,
-    fy = 2022,
-    eth_float = 0,
+    sf_ac_max = 20,
+    fy = 2023,
+    eth_float = 1,
     R_mu = log(0.06),
     R_sigma = sqrt(log(1+0.03^2/0.06^2)),
     S_lambda = 0.002,
@@ -81,6 +82,7 @@ refiant_sim <- function(
     output_L2_insolvent <- c()
     output_L1_insolvent <- c()
     
+    output_premium <- c()
     output_claims <- c()
     output_wind <- c()
     output_hail <- c()
@@ -97,17 +99,17 @@ refiant_sim <- function(
         filter(YEAR == wy[j])
       
       # simulation
-      L2 = c(n_assets * CAR * (1 - L1_ratio))
+      L2 = c(n_bonds * CAR * (1 - L1_ratio))
       L2_insolvency = c(0)
       
-      L1 <- c(n_assets * CAR * L1_ratio)
+      L1 <- c(n_bonds * CAR * L1_ratio)
       L1_insolvency = c(0)
       
       for (i in 1:nrow(j_simulation)) {
         
         L2[i+1] = L2[i] * (1 + j_simulation$I[i]) + j_simulation$P[i] * (1 - alpha) - j_simulation$claims[i]
         L1[i+1] = L1[i] * (1 + j_simulation$Y[i]) + 
-          j_simulation$P[i] * alpha * (I(eth_float == 1)*1 / j_simulation$eth_usd[i] + I(eth_float == 0)*1)  + 
+          j_simulation$P[i] * alpha * (I(eth_float == 1)*j_simulation$eth_usd[1] / j_simulation$eth_usd[i] + I(eth_float == 0)*1)  + 
           min(L2[i+1], 0) * ((j_simulation$eth_usd[1]/j_simulation$eth_usd[i] - 1) * 
                                         I(eth_float == 1)*1 + 1)
         
@@ -143,6 +145,7 @@ refiant_sim <- function(
           0
         }
       
+      output_premium[j] = sum(j_simulation$P)
       output_claims[j] = sum(j_simulation$claims)
       output_wind[j] = sum(j_simulation$GUST)
       output_fire[j] = sum(j_simulation$fire)
@@ -174,6 +177,7 @@ refiant_sim <- function(
                    L1_return = output_L1_return,
                    L2_insolvent = output_L2_insolvent,
                    L1_insolvent = output_L1_insolvent,
+                   yearly_premium = output_premium,
                    claims = output_claims,
                    wind = output_wind,
                    fire = output_fire,
@@ -212,7 +216,8 @@ refiant_sim <- function(
     labs(x = "Weather Year", y = "Return (%)", title = "Porfolio returns per iteration year") +
     theme(legend.position = "none",
           axis.text.x = element_text(angle = 90, hjust = 1)) +
-    facet_wrap(~Pool, nrow = 2)
+    facet_wrap(~Pool, nrow = 2)  + 
+    ylim(-100, 100)
     
   # solvency distribution
   plt_insolvency <<- output %>% 

@@ -13,6 +13,18 @@ sim_sf <- solar_lookup %>%
   .$case_id %>% 
   sample(size = n_assets, replace = FALSE)
 
+solar_lookup_concat <- solar_lookup %>% 
+  filter(case_id %in% sim_sf)
+
+# calculate the n_bonds across n_assets for CAR
+n_bonds = solar_lookup_concat %>% 
+  summarise(wind = sum(GUST_34 > 0),
+            hail = sum(HAIL_2.0 > 0),
+            fire = sum(FIRE > 0),
+            hurricane = sum(HURRICANE > 0)) %>% 
+  summarise(n = wind + hail + fire + hurricane) %>% 
+  .$n
+
 # GUST
 gust <- solar_gsod_lookup %>% 
   filter(case_id %in% sim_sf &
@@ -27,7 +39,7 @@ gsod_events <- gsod_peril %>%
   semi_join(gust, by = c("STNID", "YEAR")) %>% 
   # 34kt-50kt GUST trigger
   group_by(STNID, YEARMODA, YEAR) %>% 
-  summarise(GUST = sum(GUST >= 34 & GUST < 50)) %>% 
+  summarise(GUST = sum(GUST >= 34)) %>% 
   ungroup()
 
 time_index = seq(from = ymd(paste0(min(wy), "-01-01")), 
@@ -46,8 +58,7 @@ state_code_to_name <- function(code) {
   state.name[match_idx]
 }
 
-fire <- solar_lookup %>% 
-  filter(case_id %in% sim_sf) %>% 
+fire <- solar_lookup_concat %>% 
   select(case_id, p_state, p_county) %>% 
   mutate(noaa_state = tolower(state_code_to_name(p_state)),
          noaa_county = tolower(p_county)) %>% 
@@ -93,13 +104,12 @@ sim_fire <- tibble(case_id = rep(sim_sf, each = length(time_index)),
   
 # hail
 hail <- hail_swaths %>% 
-  # trigger on hail size 1.75ins
-  filter(MAGNITUDE >= 1.75) %>% 
+  # trigger on hail size 2ins
+  filter(MAGNITUDE >= 2) %>% 
   st_transform(crs = 3857) %>% 
   mutate(geometry = st_buffer(geometry, dist = 10000)) # add 10km buffer to hail swaths
 
-solar_sf <- solar_lookup %>% 
-  filter(case_id %in% sim_sf) %>% 
+solar_sf <- solar_lookup_concat %>% 
   select(case_id, xlong, ylat) %>% 
   st_as_sf(coords = c("xlong", "ylat"), crs = 4326) %>% 
   st_transform(crs = 3857)
@@ -169,10 +179,9 @@ sim_prices <- prices %>%
          year_index = fy_index[as.character(year(date))])
 
 # premiums = expected value: sum all claims pay uniformly everyday
-sim_premium <- simulation %>% 
-  select(-YEAR, -YEARMODA) %>% 
-  unlist() %>% 
-  sum()/nrow(simulation)
+technical_premium <- solar_lookup_concat %>% 
+  summarise(P = sum(GUST_34, HAIL_2.0, HURRICANE, FIRE)) %>% 
+  .$P
   
 simulation <- simulation %>% 
   mutate(doy = yday(YEARMODA),
@@ -187,7 +196,7 @@ simulation <- simulation %>%
          Y = R/365 - S * G,
          eta = runif(nrow(.), 0, 1),
          I = eta * rf_ret + (1 - eta) * sp500_ret) %>% 
-  mutate(P = sim_premium)
+  mutate(P = technical_premium/loss_ratio)
 
 # Portfolio distance/concentration metric
 SDI <- solar_lookup %>% 

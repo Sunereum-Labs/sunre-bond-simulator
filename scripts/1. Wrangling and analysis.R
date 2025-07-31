@@ -845,8 +845,13 @@ tz_lookup <- c(
 )
 
 noaa <- noaa %>% 
-  mutate(BEGIN_DATE_TIME_PARSED = dmy_hms(BEGIN_DATE_TIME),
-         END_DATE_TIME_PARSED = dmy_hms(END_DATE_TIME),
+  # parse datetime
+  mutate(BEGIN_DATE_TIME_PARSED = ymd_hms(
+           paste0(substr(BEGIN_YEARMONTH, 1, 4), "-", substr(BEGIN_YEARMONTH, 5, 6), "-",
+                  BEGIN_DAY, "-", substr(BEGIN_DATE_TIME, 11, 18))), # YEARMONTH, DAY, TIME is more robust 
+         END_DATE_TIME_PARSED = ymd_hms(
+           paste0(substr(END_YEARMONTH, 1, 4), "-", substr(END_YEARMONTH, 5, 6), "-",
+                  END_DAY, "-", substr(END_DATE_TIME, 11, 18))),
          TZONE = tz_lookup[CZ_TIMEZONE],
          BEGIN_DATE_TIME_PARSED = force_tzs(time = BEGIN_DATE_TIME_PARSED, 
                                             tzones = TZONE,
@@ -864,6 +869,10 @@ hail_sf <- noaa %>%
   st_as_sf(coords = c("BEGIN_LON","BEGIN_LAT"),
                     crs = 4326) %>%
   st_transform(crs = 3857)
+
+# maximum and minimum datetime parsed, number of NAs
+min(hail_sf$BEGIN_DATE_TIME_PARSED, na.rm = TRUE); max(hail_sf$BEGIN_DATE_TIME_PARSED, na.rm = TRUE)
+hail_sf %>% filter(is.na(BEGIN_DATE_TIME_PARSED)) %>% nrow()
 
 # maximum distance and temporal swath radius
 spatial_eps = 40*1000 # 40km in m
@@ -1111,10 +1120,10 @@ hurricane %>%
 hurricane <- hurricane %>% 
   mutate(across(ne_radii_34kt:nw_radii_64kt, ~ na_if(., 0)))
 
-# now let's find system level and swath means for radii -- we are only interested in 34kt
-radii_50kt_means <- hurricane %>% 
-  select(status, ne_radii_50kt:nw_radii_50kt) %>% 
-  pivot_longer(cols = ne_radii_50kt:nw_radii_50kt, names_to = "var", values_to = "value") %>% 
+# now let's find system level and swath means for radii -- we are only interested in 64kt
+radii_64kt_means <- hurricane %>% 
+  select(status, ne_radii_64kt:nw_radii_64kt) %>% 
+  pivot_longer(cols = ne_radii_64kt:nw_radii_64kt, names_to = "var", values_to = "value") %>% 
   filter(!is.na(value)) %>% 
   group_by(status) %>% 
   summarise(n = n(),
@@ -1123,9 +1132,9 @@ radii_50kt_means <- hurricane %>%
             max = max(value)) %>% 
   ungroup()
 
-radii_50kt_swath_means <- hurricane %>% 
-  select(swath_id, ne_radii_50kt:nw_radii_50kt) %>% 
-  pivot_longer(cols = ne_radii_50kt:nw_radii_50kt, names_to = "var", values_to = "value") %>% 
+radii_64kt_swath_means <- hurricane %>% 
+  select(swath_id, ne_radii_64kt:nw_radii_64kt) %>% 
+  pivot_longer(cols = ne_radii_64kt:nw_radii_64kt, names_to = "var", values_to = "value") %>% 
   filter(!is.na(value)) %>% 
   group_by(swath_id) %>% 
   summarise(ave = mean(value)) %>% 
@@ -1134,54 +1143,54 @@ radii_50kt_swath_means <- hurricane %>%
 # (sub)tropical cyclone of (sub)tropical depression intensity (SD/TD) are below 34kt by definition - we remove these
 # also remove WV, DB which aren't well defined at 50kt
 hurricane <- hurricane %>% 
-  filter(!(status %in% c("TD", "SD", "WV", "DB"))) %>%
-  select(-c(ne_radii_34kt:nw_radii_34kt, ne_radii_64kt:nw_radii_64kt))
+  filter(status %in% c("HU", "EX", "LO")) %>%
+  select(-c(ne_radii_34kt:nw_radii_50kt))
 
 # replace radii NAs
 hurricane <- hurricane %>%
   # 1: take tangential radii values for each observation
-  mutate(ne_radii_50kt = case_when(!is.na(ne_radii_50kt) ~ ne_radii_50kt,
-                                   !is.na(nw_radii_50kt) & !is.na(se_radii_50kt) ~ 
-                                     rowMeans(across(c(nw_radii_50kt, se_radii_50kt))),
+  mutate(ne_radii_64kt = case_when(!is.na(ne_radii_64kt) ~ ne_radii_64kt,
+                                   !is.na(nw_radii_64kt) & !is.na(se_radii_64kt) ~ 
+                                     rowMeans(across(c(nw_radii_64kt, se_radii_64kt))),
                                    TRUE ~ NA),
-         se_radii_50kt = case_when(!is.na(se_radii_50kt) ~ se_radii_50kt,
-                                   !is.na(ne_radii_50kt) & !is.na(sw_radii_50kt) ~ 
-                                     rowMeans(across(c(ne_radii_50kt, sw_radii_50kt))),
+         se_radii_64kt = case_when(!is.na(se_radii_64kt) ~ se_radii_64kt,
+                                   !is.na(ne_radii_64kt) & !is.na(sw_radii_64kt) ~ 
+                                     rowMeans(across(c(ne_radii_64kt, sw_radii_64kt))),
                                    TRUE ~ NA),
-         sw_radii_50kt = case_when(!is.na(sw_radii_50kt) ~ sw_radii_50kt,
-                                   !is.na(se_radii_50kt) & !is.na(nw_radii_50kt) ~ 
-                                     rowMeans(across(c(se_radii_50kt, nw_radii_50kt))),
+         sw_radii_64kt = case_when(!is.na(sw_radii_64kt) ~ sw_radii_64kt,
+                                   !is.na(se_radii_64kt) & !is.na(nw_radii_64kt) ~ 
+                                     rowMeans(across(c(se_radii_64kt, nw_radii_64kt))),
                                    TRUE ~ NA),
-         nw_radii_50kt = case_when(!is.na(nw_radii_50kt) ~ nw_radii_50kt,
-                                   !is.na(sw_radii_50kt) & !is.na(ne_radii_50kt) ~ 
-                                     rowMeans(across(c(sw_radii_50kt, ne_radii_50kt))),
+         nw_radii_64kt = case_when(!is.na(nw_radii_64kt) ~ nw_radii_64kt,
+                                   !is.na(sw_radii_64kt) & !is.na(ne_radii_64kt) ~ 
+                                     rowMeans(across(c(sw_radii_64kt, ne_radii_64kt))),
                                    TRUE ~ NA)) %>%
   # 2: take a mean of any row-wise values available
-  mutate(ne_radii_50kt = case_when(is.na(ne_radii_50kt) ~ 
-                                     rowMeans(across(c(se_radii_50kt, sw_radii_50kt, nw_radii_50kt)), na.rm = TRUE),
-                                   TRUE ~ ne_radii_50kt),
-         se_radii_50kt = case_when(is.na(se_radii_50kt) ~ 
-                                    rowMeans(across(c(ne_radii_50kt, sw_radii_50kt, nw_radii_50kt)), na.rm = TRUE),
-                                   TRUE ~ se_radii_50kt),
-         sw_radii_50kt = case_when(is.na(sw_radii_50kt) ~
-                                    rowMeans(across(c(ne_radii_50kt, se_radii_50kt, nw_radii_50kt)), na.rm = TRUE),
-                                   TRUE ~ sw_radii_50kt),
-         nw_radii_50kt = case_when(is.na(nw_radii_50kt) ~
-                                    rowMeans(across(c(ne_radii_50kt, se_radii_50kt, sw_radii_50kt)), na.rm = TRUE),
-                                   TRUE ~ nw_radii_50kt)) %>% 
+  mutate(ne_radii_64kt = case_when(is.na(ne_radii_64kt) ~ 
+                                     rowMeans(across(c(se_radii_64kt, sw_radii_64kt, nw_radii_64kt)), na.rm = TRUE),
+                                   TRUE ~ ne_radii_64kt),
+         se_radii_64kt = case_when(is.na(se_radii_64kt) ~ 
+                                    rowMeans(across(c(ne_radii_64kt, sw_radii_64kt, nw_radii_64kt)), na.rm = TRUE),
+                                   TRUE ~ se_radii_64kt),
+         sw_radii_64kt = case_when(is.na(sw_radii_64kt) ~
+                                    rowMeans(across(c(ne_radii_64kt, se_radii_64kt, nw_radii_64kt)), na.rm = TRUE),
+                                   TRUE ~ sw_radii_64kt),
+         nw_radii_64kt = case_when(is.na(nw_radii_64kt) ~
+                                    rowMeans(across(c(ne_radii_64kt, se_radii_64kt, sw_radii_64kt)), na.rm = TRUE),
+                                   TRUE ~ nw_radii_64kt)) %>% 
   # 3: join on swath level means
   ungroup() %>% 
-  left_join(radii_50kt_swath_means, by = "swath_id") %>% 
-  mutate(across(ne_radii_50kt:nw_radii_50kt, ~ coalesce(., ave))) %>% 
+  left_join(radii_64kt_swath_means, by = "swath_id") %>% 
+  mutate(across(ne_radii_64kt:nw_radii_64kt, ~ coalesce(., ave))) %>% 
   select(-ave) %>% 
   # 4: join on system level means
-  left_join(select(radii_50kt_means, status, ave), by = "status") %>% 
-  mutate(across(ne_radii_50kt:nw_radii_50kt, ~ coalesce(., ave))) %>% 
+  left_join(select(radii_64kt_means, status, ave), by = "status") %>% 
+  mutate(across(ne_radii_64kt:nw_radii_64kt, ~ coalesce(., ave))) %>% 
   select(-ave)
 
 # create a point for each radii adjustment
 hurricane_sf <- hurricane %>% 
-  pivot_longer(cols = ne_radii_50kt:nw_radii_50kt, names_to = "quadrant", values_to = "radii") %>% 
+  pivot_longer(cols = ne_radii_64kt:nw_radii_64kt, names_to = "quadrant", values_to = "radii") %>% 
   mutate(quadrant = substr(quadrant, 1, 2),
          radii = radii * 1000,
          bearing = case_when(quadrant == "ne" ~ 45,
@@ -1256,5 +1265,5 @@ ggplotly(plt)
 
 # export
 saveRDS(hurricane_swaths, file = "../data/hurricane_swaths.rds")
-rm(list = c("pacific", "atlantic", "hurricane", "radii_50kt_means", "radii_50kt_swath_means",
+rm(list = c("pacific", "atlantic", "hurricane", "radii_64kt_means", "radii_64kt_swath_means",
             "lat_new", "lon_new","plt_data1", "plt_data2", "plt", "us_map"))
