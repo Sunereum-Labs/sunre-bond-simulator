@@ -187,9 +187,11 @@ hail_events <- st_intersects(solar_sf, hail, sparse = TRUE)
 3. Aggregate premium rate across peril classes and assets
 ```math
 P_{peril, asset} = \frac{1}{t}\sum_{t}\text{I}(event_{peril, county}),
+```
+```math
 P = \sum_{peril}\sum_{asset}P_{peril, asset}
 ```
-where $t$ is the total number of days across all weather years.
+            where $t$ is the total number of days across all weather years.
 
 4. Calculate L1 and L2 yield
 ```r
@@ -205,13 +207,13 @@ where $t$ is the total number of days across all weather years.
 ```math
 SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \text{E[}D(x_i, x_j)\text{]}
 ```
-where $D$ is the Harverstine Distance between two assets, $i, j$.
+            where $D$ is the Harverstine Distance between two assets, $i, j$.
 
 6. Calculate total notional value of bonds and capital requirements
-We assume we issue a $1 notional (single-trigger) bond per peril per asset.
-Therefore, the total notional value of porfolio risk per year is number of bonds issued.
-We only issue bonds for an asset for well defined peril risks.
-A premium rate of 0 for an asset indicates the risk is undefined and no bond is issued.
+            We assume we issue a $1 notional (single-trigger) bond per peril per asset.
+            Therefore, the total notional value of porfolio risk per year is number of bonds issued.
+            We only issue bonds for an asset for well defined peril risks.
+            A premium rate of 0 for an asset indicates the risk is undefined and no bond is issued.
 ```math
 \text{Total Bonds} = \sum_{asset}\sum_{peril}\text{I}(P_{asset, peril} > 0)
 ```
@@ -247,6 +249,7 @@ Where county data is lacking, premium rate will be assigned to the state average
 Premium rate is calculated for different hail and wind triggers, which are adjustable in the simulation scripts:
 - Hail: 1", 1.5", 2" and 2.5" triggers
 - Wind: 34kt, 40kt, 45kt, 50kt, 60kt and 64kt triggers
+
 Premium rates are merged on a per asset basis to the solar farm asset lookup table and accessible as a `.csv` in `./premium/`.
 
 ![Frequency of 2" hail events](premium/hail.jpg) <br>
