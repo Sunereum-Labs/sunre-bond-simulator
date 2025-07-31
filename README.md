@@ -50,7 +50,7 @@ Selection of specific assets is easily configurable in the code-base down the ro
 The simulator runs _m_ portfolio iterations containing _n_ assets over _y_ historical weather years.
 This creates _m_ x _n_ x _y_ datapoints of risk.
 
-Details on protocol design, data sources, augmentations and assumptions, and US solar sites on Notion: https://www.notion.so/Refiant-Simulator-1ecdd598bdb480939e38ff1098cdc9a9
+Details on protocol design, data sources, augmentations and assumptions, and US solar sites on Notion: https://www.notion.so/SunRE-Simulator-1ecdd598bdb480939e38ff1098cdc9a9
 
 ## Running the Simulator
 
@@ -75,7 +75,7 @@ install.packages("sf")
 In RUN SIMULATION.R, `sunrefi_sim()` will call on the program to run the simulation. 
 Any individual or combinations of variables is settable in the following list of arguments in `sunrefi_sim()` (default values shown):
 ```r
-refiant_sim(seed = 100, # sets seed for random asset selection and investment returns
+sunrefi_sim(seed = 100, # sets seed for random asset selection and investment returns
             iter = 20, # number of random portfolios to iterate over (m)
             wy = 1955:2023, # vector of weather years
             CAR = 0.5, # capital-adequacy-ratio, e.g. CAR = 0.2 => $0.2 of capital for every $1 of risk
