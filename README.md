@@ -180,7 +180,9 @@ hail <- hail_swaths %>%
 hail_events <- st_intersects(solar_sf, hail, sparse = TRUE)
 ```
 3. Calculate fair value premium for the portfolio.
-$$ P = \frac{1}{n}\summation_{peril}\summation_{asset}\text{I}(event_{peril, asset}), $$
+```math
+P = \frac{1}{n}\sum_{peril}\sum_{asset}\text{I}(event_{peril, asset}),
+```
 where $n$ is the total number of days across all weather years.
 
 4. Calculate L1 and L2 yield
@@ -194,8 +196,10 @@ where $n$ is the total number of days across all weather years.
 ```
 
 5. Calculate standardised diversity index (SDI)
-$$ SDI = \frac{(\summation_{asset} D(x_i, x_j))^2}{\summation_{asset} D(x_i, x_j)^2} \times \expectation{D(x_i, x_j)} $$
-
+```math
+SDI = \frac{(\sum_{asset} D(x_i, x_j))^2}{\sum_{asset} D(x_i, x_j)^2} \times \text{E[}D(x_i, x_j)\text{]}
+```
+where $D$ is the Harverstine Distance between two assets, $i, j$.
 
 
 
