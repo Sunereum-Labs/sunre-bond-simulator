@@ -75,7 +75,7 @@ coeffs <- c(
   module_oem_3 = log(1.07),
   module_oem_4 = log(1.15),
   acrage = log(1),
-  age = log(0.99),
+  age = log(1.01),
   voltage = log(0.995),
   magnitude = log(1.02) # above 34kt
 )
@@ -112,7 +112,7 @@ coeffs <- c(
   module_oem_3 = log(1.07),
   module_oem_4 = log(1.15),
   acrage = log(1),
-  age = log(0.99),
+  age = log(1.01),
   voltage = log(0.995),
   magnitude = log(1)
 )
@@ -149,7 +149,7 @@ coeffs <- c(
   module_oem_3 = log(1.07),
   module_oem_4 = log(1.15),
   acrage = log(1),
-  age = log(0.99),
+  age = log(1.01),
   voltage = log(0.995),
   magnitude = log(1)
 )
@@ -168,16 +168,15 @@ fire_coeffs <- coeffs
 
 # simulate parameters for solar look-up
 solar_lookup <- solar_lookup %>% 
-  mutate(tiv = 1000000/0.05 * p_cap_ac,
+  mutate(tiv = 1000000*1.2 * p_cap_ac,
          inverter_oem = sample(c(1, 2, 3, 4), size = n(), replace = TRUE, prob = c(0.4, 0.3, 0.2, 0.1)),
          racking_type = sample(c("fixed", "single", "dual"), size = n(), replace = TRUE, prob = c(0.3, 0.5, 0.2)),
-         racking_oem = sample(c(1, 2, 3), size = n(), replace = TRUE, prob = c(0.3, 0.6, 0.1)),
+         racking_oem = sample(c(1, 2, 3), size = n(), replace = TRUE, prob = c(0.4, 0.55, 0.05)),
          max_title_angle = sample(c(30:75),  size = n(), replace = TRUE),
          module_oem = sample(c(1, 2, 3, 4), size = n(), replace = TRUE, prob = c(0.1, 0.2, 0.4, 0.3)),
          acrage = 5 * p_cap_ac,
          age = 2025 - p_year,
-         voltage = case_when(age > 15 ~ 300,
-                             age > 10 ~ sample(c(300, 600), size = n(), replace = TRUE)[row_number()],
+         voltage = case_when(age > 10 ~ 600,
                              age > 5 ~ sample(c(600, 1000), size = n(), replace = TRUE, prob = c(0.4, 0.6))[row_number()],
                              TRUE ~ sample(c(600, 1000, 1500), size = n(), replace = TRUE, prob = c(0.05, 0.4, 0.55))[row_number()]
          )
