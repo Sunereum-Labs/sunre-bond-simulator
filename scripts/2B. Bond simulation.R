@@ -73,7 +73,7 @@ sunrefi_sim <- function(
     cat("Starting iteration ", m)
     
     # data setup
-    source("./scripts/2. Simulation setup.R", local = TRUE)
+    source("./scripts/2A. Bond simulation setup.R", local = TRUE)
     
     # output fields
     output_L2_return <- c()

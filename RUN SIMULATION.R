@@ -2,7 +2,7 @@
 # install.packages("geosphere")
 # install.packages("sf")
 
-source("./scripts/3. Simulation.R")
+source("./scripts/2B. Bond simulation.R")
 
 sunrefi_sim(iter = 100)
 

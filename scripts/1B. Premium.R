@@ -38,7 +38,7 @@ coeffs <- c(
   module_oem_3 = log(1.15),
   module_oem_4 = log(1.45),
   acrage = log(1),
-  age = log(0.99),
+  age = log(1.01),
   voltage = log(0.995),
   magnitude = log(1.5) # for deviations away from 1"
 )
@@ -535,6 +535,64 @@ solar_lookup_premium %>%
   geom_histogram(aes(x = technical_premium), bins = 60) +
   theme_minimal()
 
+
+# ---- Commercial Premium Rates ----
+# commercial rates
+commercial_rates <- c(
+  # Southwest
+  "AZ" = 0.4, "NM" = 0.4, "NV" = 0.4, "UT" = 0.4,
+  
+  # California (separate due to unique rain pattern)
+  "CA" = 0.45,
+  
+  # Pacific Northwest
+  "WA" = 0.35, "OR" = 0.35,
+  
+  # Midwest
+  "IL" = 0.4, "IN" = 0.4, "IA" = 0.4, "OH" = 0.4,
+  "MI" = 0.4, "WI" = 0.4, "MN" = 0.4, "MO" = 0.4,
+  "ND" = 0.4, "SD" = 0.4, "NE" = 0.4, "KS" = 0.4,
+  
+  # Northeast
+  "NY" = 0.5, "PA" = 0.5, "MA" = 0.5, "NJ" = 0.5,
+  "CT" = 0.5, "RI" = 0.5, "VT" = 0.5, "NH" = 0.5,
+  "ME" = 0.5,
+  
+  # Gulf Coast / Southeast (humid subtropical)
+  "FL" = 0.4, "LA" = 0.4, "MS" = 0.4,
+  "AL" = 0.4, "GA" = 0.4, "SC" = 0.4,
+  "NC" = 0.4, "TX" = 0.55,
+  
+  # Appalachians / Interior Southeast
+  "TN" = 0.35, "KY" = 0.35, "WV" = 0.35,
+  "VA" = 0.35, "AR" = 0.35,
+  
+  # Hawaii
+  "HI" = 0.4,
+  
+  # Alaska
+  "AK" = 0.3,
+  
+  # Mountain/Intermountain West (drier)
+  "CO" = 0.35, "MT" = 0.35, "ID" = 0.35, "WY" = 0.35,
+  
+  # Plains crossover
+  "OK" = 0.4,  # could also go "Plains"
+  
+  # Mid-Atlantic
+  "DE" = 0.4, "MD" = 0.4, "DC" = 0.4  # if using DC
+  
+  # Not included: territories like PR, GU, VI
+)
+
+solar_lookup_premium <- solar_lookup_premium %>% 
+  mutate(commercial_premium = commercial_rates[p_state])
+
 # save data
 write_csv(solar_lookup_premium, file = "../premium/solar_lookup_with_premium.csv")
+write_csv(solar_lookup_premium, file = "../risk_engine/input/solar_lookup_with_premium.csv")
+saveRDS(list(hail_coeffs, 
+               storm_coeffs,
+               hurricane_coeffs,
+               fire_coeffs), file = "../premium/severity_coefficients.rds")
   
