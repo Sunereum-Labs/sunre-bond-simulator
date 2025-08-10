@@ -57,12 +57,15 @@ risk_engine <- function(
   
   # total tiv
   p <- solar_lookup_concat %>% 
-    summarise(portfolio = "total tiv",
-              tiv = sum(tiv)) %>% 
+    summarise(portfolio = "",
+              tiv = sum(tiv)/1e6) %>% 
     ggplot() +
     geom_bar(aes(x = portfolio, y = tiv), stat = "identity") +
-    geom_hline(yintercept = 1.2 * sum(solar_lookup_concat$tiv), linetype = 2) +
-    theme_minimal()
+    geom_hline(yintercept = 1.2 * sum(solar_lookup_concat$tiv)/1e6, linetype = 2) +
+    theme_minimal() +
+    xlab("Aggregate Total Insured Value") +
+    ylab("USD'millions")
+    
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -72,12 +75,14 @@ risk_engine <- function(
   # state
   p <- solar_lookup_concat %>% 
     group_by(p_state) %>% 
-    summarise(tiv = sum(tiv)) %>% 
+    summarise(tiv = sum(tiv)/1e3) %>% 
     ungroup() %>% 
     ggplot() +
     geom_bar(aes(x = p_state, y = tiv), stat = "identity") +
-    geom_hline(yintercept = 0.2 * sum(solar_lookup_concat$tiv), linetype = 2) +
-    theme_minimal()
+    geom_hline(yintercept = 0.2 * sum(solar_lookup_concat$tiv)/1e3, linetype = 2) +
+    theme_minimal() +
+    xlab("State") +
+    ylab("USD'thousands")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -87,11 +92,11 @@ risk_engine <- function(
   # county
   p <- solar_lookup_concat %>% 
     group_by(p_county) %>% 
-    summarise(tiv = sum(tiv)) %>% 
+    summarise(tiv = sum(tiv)/1e3) %>% 
     ungroup() %>% 
     ggplot() +
     geom_bar(aes(x = p_county, y = tiv), stat = "identity") +
-    geom_hline(yintercept = 0.05 * sum(solar_lookup_concat$tiv), linetype = 2) +
+    geom_hline(yintercept = 0.05 * sum(solar_lookup_concat$tiv)/1e3, linetype = 2) +
     theme_minimal() +
     theme(
       axis.text.x = element_text(
@@ -99,7 +104,9 @@ risk_engine <- function(
         hjust = 1,           # horizontal justification
         vjust = 1            # vertical justification
       )
-    )
+    ) +
+    xlab("County") +
+    ylab("USD'thousands")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -109,12 +116,14 @@ risk_engine <- function(
   # inverter oem
   p <- solar_lookup_concat %>% 
     group_by(inverter_oem) %>% 
-    summarise(tiv = sum(tiv)) %>% 
+    summarise(tiv = sum(tiv)/1e6) %>% 
     ungroup() %>% 
     ggplot() +
     geom_bar(aes(x = inverter_oem, y = tiv), stat = "identity") +
-    geom_hline(yintercept = 0.75 * sum(solar_lookup_concat$tiv), linetype = 2) +
-    theme_minimal()
+    geom_hline(yintercept = 0.75 * sum(solar_lookup_concat$tiv)/1e6, linetype = 2) +
+    theme_minimal() +
+    xlab("Inverter OEM") +
+    ylab("USD'millions")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -124,12 +133,14 @@ risk_engine <- function(
   # racking oem
   p <- solar_lookup_concat %>% 
     group_by(racking_oem) %>% 
-    summarise(tiv = sum(tiv)) %>% 
+    summarise(tiv = sum(tiv)/1e6) %>% 
     ungroup() %>% 
     ggplot() +
     geom_bar(aes(x = racking_oem, y = tiv), stat = "identity") +
-    geom_hline(yintercept = 0.75 * sum(solar_lookup_concat$tiv), linetype = 2) +
-    theme_minimal()
+    geom_hline(yintercept = 0.75 * sum(solar_lookup_concat$tiv)/1e6, linetype = 2) +
+    theme_minimal() +
+    xlab("Racking OEM") +
+    ylab("USD'millions")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -139,11 +150,13 @@ risk_engine <- function(
   # racking type
   p <- solar_lookup_concat %>% 
     group_by(racking_type) %>% 
-    summarise(tiv = sum(tiv)) %>% 
+    summarise(tiv = sum(tiv)/1e6) %>% 
     ungroup() %>% 
     ggplot() +
     geom_bar(aes(x = racking_type, y = tiv), stat = "identity") +
-    theme_minimal()
+    theme_minimal() +
+    xlab("Racking Type") +
+    ylab("USD'millions")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -153,12 +166,14 @@ risk_engine <- function(
   # module oem
   p <- solar_lookup_concat %>% 
     group_by(module_oem) %>% 
-    summarise(tiv = sum(tiv)) %>% 
+    summarise(tiv = sum(tiv)/1e6) %>% 
     ungroup() %>% 
     ggplot() +
     geom_bar(aes(x = module_oem, y = tiv), stat = "identity") +
-    geom_hline(yintercept = 0.75 * sum(solar_lookup_concat$tiv), linetype = 2) +
-    theme_minimal()
+    geom_hline(yintercept = 0.75 * sum(solar_lookup_concat$tiv)/1e6, linetype = 2) +
+    theme_minimal() +
+    xlab("Module OEM") +
+    ylab("USD'millions")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -168,11 +183,14 @@ risk_engine <- function(
   # age, max tilt angle and voltage
   p <- solar_lookup_concat %>% 
     select(age, max_title_angle, voltage) %>%
-    pivot_longer(cols = age:voltage, names_to = "variable", values_to = "value") %>% 
+    rename("Age" = age, "Maximum Tilt Angle" = max_title_angle, "Voltage" = voltage) %>% 
+    pivot_longer(cols = Age:Voltage, names_to = "variable", values_to = "value") %>% 
     ggplot() +
     geom_boxplot(aes(x = variable, y = value, group = variable)) +
     facet_wrap(~variable, scales = "free", nrow = 1) +
-    theme_minimal()
+    theme_minimal() +
+    xlab("") +
+    ylab("")
   
   p <- ggplotly(p)
   p <- plotly_build(p)$x
@@ -216,14 +234,14 @@ risk_engine <- function(
     left_join(
       summarise(
         group_by(premium, p_state),
-        loss_ratio = sum(simulation_premium+0.0001)/sum(commercial_premium)),
+        loss_ratio = sum(simulation_premium)/sum(commercial_premium)),
       by = c("STUSPS"="p_state")) %>% 
     filter(!(STUSPS %in% c("AK", "AS", "MP", "GU", "HI", "PR", "VI"))) %>% 
     ggplot() +
-    geom_sf(aes(fill = loss_ratio)) +
-    scale_fill_gradient2(low = "blue",
-                         mid = "white",
+    geom_sf(aes(fill = loss_ratio), color = "white") +
+    scale_fill_gradient2(low = "green",
                          high = "red",
+                         na.value = "grey",
                          midpoint = target_loss_ratio) +
     
     theme_minimal()
