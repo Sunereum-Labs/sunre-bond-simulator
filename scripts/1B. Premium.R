@@ -20,19 +20,19 @@ us_states <- states() %>%
 # ---- Exposure Severity & Premium Multiple ----
 # hail
 coeffs <- c(
-  c = log(0.8),
+  c = log(0.4),
   inverter_oem_1 = log(1),
   inverter_oem_2 = log(1.07),
   inverter_oem_3 = log(0.95),
   inverter_oem_4 = log(0.9),
   racking_roof = log(2.2),
-  racking_fixed = log(2.0),
+  racking_fixed = log(1),
   racking_single = log(1),
-  racking_dual = log(0.8),
+  racking_dual = log(1.2),
   racking_oem_1 = log(1),
   racking_oem_2 = log(0.6),
   racking_oem_3 = log(1.2),
-  max_tilt_angle_minus_30 = log(0.97),
+  max_tilt_angle_minus_30 = log(0.96),
   module_oem_1 = log(1),
   module_oem_2 = log(1.03),
   module_oem_3 = log(1.15),
@@ -40,7 +40,7 @@ coeffs <- c(
   acrage = log(1),
   age = log(1.01),
   voltage = log(0.995),
-  magnitude = log(1.5) # for deviations away from 1"
+  magnitude = log(2) # for deviations away from 1"
 )
 
 # sample plant
@@ -170,9 +170,13 @@ fire_coeffs <- coeffs
 solar_lookup <- solar_lookup %>% 
   mutate(tiv = 1000000*1.2 * p_cap_ac,
          inverter_oem = sample(c(1, 2, 3, 4), size = n(), replace = TRUE, prob = c(0.4, 0.3, 0.2, 0.1)),
-         racking_type = sample(c("fixed", "single", "dual"), size = n(), replace = TRUE, prob = c(0.3, 0.5, 0.2)),
-         racking_oem = sample(c(1, 2, 3), size = n(), replace = TRUE, prob = c(0.4, 0.55, 0.05)),
-         max_title_angle = sample(c(30:75),  size = n(), replace = TRUE),
+         racking_type = sample(c("fixed", "single", "dual"), size = n(), replace = TRUE, prob = c(0.05, 0.8, 0.15)),
+         racking_oem = case_when(racking_type == "fixed" ~ 1,
+                                 TRUE ~ sample(c(2, 3), size = n(), replace = TRUE, prob = c(0.9, 0.1))[row_number()]
+                                 ),
+         max_title_angle = case_when(racking_type == "fixed" ~ sample(c(30:40),  size = n(), replace = TRUE)[row_number()],
+                                     TRUE ~ sample(c(60:75), size = n(), replace = TRUE)[row_number()]
+                                     ),
          module_oem = sample(c(1, 2, 3, 4), size = n(), replace = TRUE, prob = c(0.1, 0.2, 0.4, 0.3)),
          acrage = 5 * p_cap_ac,
          age = 2025 - p_year,
@@ -540,10 +544,10 @@ solar_lookup_premium %>%
 # commercial rates
 commercial_rates <- c(
   # Southwest
-  "AZ" = 0.4, "NM" = 0.4, "NV" = 0.4, "UT" = 0.4,
+  "AZ" = 0.5, "NM" = 0.4, "NV" = 0.4, "UT" = 0.4,
   
   # California (separate due to unique rain pattern)
-  "CA" = 0.45,
+  "CA" = 0.8,
   
   # Pacific Northwest
   "WA" = 0.35, "OR" = 0.35,
@@ -561,7 +565,7 @@ commercial_rates <- c(
   # Gulf Coast / Southeast (humid subtropical)
   "FL" = 0.4, "LA" = 0.4, "MS" = 0.4,
   "AL" = 0.4, "GA" = 0.4, "SC" = 0.4,
-  "NC" = 0.4, "TX" = 0.55,
+  "NC" = 0.4, "TX" = 0.9,
   
   # Appalachians / Interior Southeast
   "TN" = 0.35, "KY" = 0.35, "WV" = 0.35,

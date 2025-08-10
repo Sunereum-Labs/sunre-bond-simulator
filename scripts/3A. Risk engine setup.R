@@ -147,10 +147,25 @@ sim_claims <- sim_noaa %>%
   mutate(hurricane = replace_na(hurricane, 0),
          HURRICANE_MAGNITUDE = replace_na(HURRICANE_MAGNITUDE, 0),
          GUST = replace_na(GUST, 0),
-         GUST_MAGNITUDE = replace_na(GUST_MAGNITUDE, 0))
+         GUST_MAGNITUDE = replace_na(GUST_MAGNITUDE, 0)) %>% 
+  # create row_number to retain the first entry for each case_id
+  group_by(case_id) %>% 
+  mutate(indx = row_number()) %>% 
+  ungroup() %>% 
+  filter(!(indx > 1 & fire == 0 & hail == 0 & hurricane == 0 & GUST == 0)) %>% 
+  select(-indx)
+
+# simulation super set
+n <- nrow(sim_claims)
+simulation <- sim_claims[rep(seq_len(n), iter), ]
 
 # merge on claim severity data
-simulation <- sim_claims %>% 
+simulation <- simulation %>% 
+  # create index for each iteration
+  mutate(iter = rep(1:iter, each = n)) %>% 
+  # draw fire incidence from a random poisson with lambda = 0.05 and hurricane lambda = 0.25
+  mutate(fire = fire * sample(c(0, 1), size = n(), replace = TRUE, prob = c(0.95, 0.05)),
+         hurricane = hurricane * sample(c(0, 1), size = n(), replace = TRUE, prob = c(0.75, 0.25))) %>% 
   left_join(
     select(solar_lookup_concat, case_id, tiv, hail_claim_severity_multiple:fire_claim_severity_multiple),
     by = "case_id"
