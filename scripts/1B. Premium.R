@@ -380,15 +380,27 @@ hurricane_swath_states <- hurricane_swath_counties %>%
   ungroup()
 
 # maps
+sun_blue = "#2563EB"
+sun_green = "#16A34A"
+sun_purple = "#9333EA"
+sun_red = "#E53935"
+sun_orange = "#FB8C00"
+
 hail_2.0 <- us_counties %>% 
   left_join(hail_swath_counties, by = c("NAME", "STATEFP")) %>% 
   st_transform(crs = 4326) %>% 
   select(HAIL_2.0, NAME, STATEFP) %>% 
   filter(!(STATEFP %in% c("02", "60", "69", "66", "15", "72", "78"))) %>% 
   ggplot() +
-  geom_sf(aes(fill = HAIL_2.0*100), size = 0.01) +
+  geom_sf(aes(fill = HAIL_1.0*100), size = 0.01) +
   labs(fill = "Freq. of 2ins Hail (%)") +
-  theme_minimal()
+  theme_minimal() +
+  scale_fill_gradient(low = "white",
+                      high = sun_blue)
+p <- ggplotly(p)
+p <- plotly_build(p)$x
+payload <- list(data=p$data, layout=p$layout, config=p$config)
+write_json(payload, "../risk_engine/plots/dash4_p1.json", auto_unbox = TRUE, pretty = FALSE)
 
 hurricane_50 <- us_counties %>% 
   left_join(hurricane_swath_counties, by = c("NAME", "STATEFP")) %>% 
@@ -398,7 +410,13 @@ hurricane_50 <- us_counties %>%
   ggplot() +
   geom_sf(aes(fill = HURRICANE*100), size = 0.01) +
   labs(fill = "Freq. of 50kt Hurricane (%)") +
-  theme_minimal()
+  theme_minimal() +
+  scale_fill_gradient(low = "white",
+                      high = sun_green)
+p <- ggplotly(p)
+p <- plotly_build(p)$x
+payload <- list(data=p$data, layout=p$layout, config=p$config)
+write_json(payload, "../risk_engine/plots/dash4_p2.json", auto_unbox = TRUE, pretty = FALSE)
 
 fire <- us_counties %>% 
   tibble() %>% 
@@ -418,7 +436,14 @@ fire <- us_counties %>%
   ggplot() +
   geom_sf(aes(fill = FIRE*100), size = 0.01) +
   labs(fill = "Freq. of Wildfire (%)") +
-  theme_minimal()
+  theme_minimal() +
+  scale_fill_gradient(low = "white",
+                      high = sun_orange)
+
+p <- ggplotly(p)
+p <- plotly_build(p)$x
+payload <- list(data=p$data, layout=p$layout, config=p$config)
+write_json(payload, "../risk_engine/plots/dash4_p4.json", auto_unbox = TRUE, pretty = FALSE)
 
 wind_34 <- us_counties %>% 
   tibble() %>% 
@@ -433,7 +458,14 @@ wind_34 <- us_counties %>%
   ggplot() +
   geom_sf(aes(fill = GUST_34*100), size = 0.01) +
   labs(fill = "Freq. of 34kt Winds (%)") +
-  theme_minimal()
+  theme_minimal() +
+  scale_fill_gradient(low = "white",
+                      high = sun_purple)
+
+p <- ggplotly(p)
+p <- plotly_build(p)$x
+payload <- list(data=p$data, layout=p$layout, config=p$config)
+write_json(payload, "../risk_engine/plots/dash4_p3.json", auto_unbox = TRUE, pretty = FALSE)
 
 ggsave(filename = "../premium/hail.jpg", hail_2.0, width = 4200, heigh = 2100, units = "px")
 ggsave(filename = "../premium/hurricane.jpg", hurricane_50, width = 4200, heigh = 2100, units = "px")

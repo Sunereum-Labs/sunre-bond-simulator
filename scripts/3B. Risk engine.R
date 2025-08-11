@@ -483,7 +483,7 @@ risk_engine <- function(
   p <- ggplotly(p)
   p <- plotly_build(p)$x
   payload <- list(data=p$data, layout=p$layout, config=p$config)
-  write_json(payload, "./risk_engine/plots/dash2_p13.json", auto_unbox = TRUE, pretty = FALSE)
+  write_json(payload, "./risk_engine/plots/dash2_p14.json", auto_unbox = TRUE, pretty = FALSE)
   
   p <- premium %>% 
     mutate(loss_ratio = simulation_premium/commercial_premium) %>% 
@@ -496,8 +496,7 @@ risk_engine <- function(
   p <- ggplotly(p)
   p <- plotly_build(p)$x
   payload <- list(data=p$data, layout=p$layout, config=p$config)
-  write_json(payload, "./risk_engine/plots/dash2_p13.json", auto_unbox = TRUE, pretty = FALSE)
-  
+  write_json(payload, "./risk_engine/plots/dash2_p15.json", auto_unbox = TRUE, pretty = FALSE)
   
   
   # ----
@@ -532,9 +531,9 @@ risk_engine <- function(
                color = censored_loss_rate), 
                size = 0.8,
                show.legend = FALSE) +
-    scale_color_gradient2(low = "green",
+    scale_color_gradient2(low = sun_green,
                           mid = "black",
-                          high = "red",
+                          high = sun_red,
                           midpoint = target_loss_ratio) +
     coord_fixed(1.3) +
     theme_minimal()
@@ -543,8 +542,134 @@ risk_engine <- function(
   p <- plotly_build(p)$x
   payload <- list(data=p$data, layout=p$layout, config=p$config)
   write_json(payload, "./risk_engine/plots/dash3_p1.json", auto_unbox = TRUE, pretty = FALSE)
-    
   
+  
+  # ----
+  # Dashboard 4: CAT Risk
+  
+  us_counties <- counties() %>% 
+    st_transform(crs = 4326)
+  
+  # frequency
+  p <- simulation %>% 
+    group_by(YEAR, iter) %>% 
+    summarise(hail = sum(hail_insured_claim > 0)) %>% 
+    ungroup() %>% 
+    ggplot() +
+    geom_histogram(aes(x = hail), fill = sun_blue) +
+    theme_minimal() +
+    xlab("Number of Claims") +
+    ylab("Count of Simulation Years") +
+    ggtitle("Annual Insured Hail Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p5.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    group_by(YEAR, iter) %>% 
+    summarise(hurricane = sum(hurricane_insured_claim > 0)) %>% 
+    ungroup() %>% 
+    ggplot() +
+    geom_histogram(aes(x = hurricane), fill = sun_green) +
+    theme_minimal() +
+    xlab("Number of Claims") +
+    ylab("Count of Simulation Years") +
+    ggtitle("Annual Insured Hurricane Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p6.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    group_by(YEAR, iter) %>% 
+    summarise(storm = sum(storm_insured_claim > 0)) %>% 
+    ungroup() %>% 
+    ggplot() +
+    geom_histogram(aes(x = storm), fill = sun_purple) +
+    theme_minimal() +
+    xlab("Number of Claims") +
+    ylab("Count of Simulation Years") +
+    ggtitle("Annual Insured Storm Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p7.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    group_by(YEAR, iter) %>% 
+    summarise(fire = sum(fire_insured_claim > 0)) %>% 
+    ungroup() %>% 
+    ggplot() +
+    geom_histogram(aes(x = fire), fill = sun_orange) +
+    theme_minimal() +
+    xlab("Number of Claims") +
+    ylab("Count of Simulation Years") +
+    ggtitle("Annual Insured Fire Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p8.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    filter(hail_insured_claim > 0) %>% 
+    ggplot() +
+    geom_histogram(aes(x = hail_insured_claim), fill = sun_blue, bins = 60) +
+    theme_minimal() +
+    xlab("Size of Claims (% of TIV)") +
+    ylab("Count of Claims") +
+    ggtitle("Distribution of Hail Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p9.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    filter(hurricane_insured_claim > 0) %>% 
+    ggplot() +
+    geom_histogram(aes(x = hurricane_insured_claim), fill = sun_green, bins = 60) +
+    theme_minimal() +
+    xlab("Size of Claims (% of TIV)") +
+    ylab("Count of Claims") +
+    ggtitle("Distribution of Hurricane Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p10.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    filter(storm_insured_claim > 0) %>% 
+    ggplot() +
+    geom_histogram(aes(x = storm_insured_claim), fill = sun_purple, bins = 60) +
+    theme_minimal() +
+    xlab("Size of Claims (% of TIV)") +
+    ylab("Count of Claims") +
+    ggtitle("Distribution of Storm Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p11.json", auto_unbox = TRUE, pretty = FALSE)
+  
+  p <- simulation %>% 
+    filter(fire_insured_claim > 0) %>% 
+    ggplot() +
+    geom_histogram(aes(x = fire_insured_claim), fill = sun_orange, bins = 60) +
+    theme_minimal() +
+    xlab("Size of Claims (% of TIV)") +
+    ylab("Count of Claims") +
+    ggtitle("Distribution of Fire Claims")
+  
+  p <- ggplotly(p)
+  p <- plotly_build(p)$x
+  payload <- list(data=p$data, layout=p$layout, config=p$config)
+  write_json(payload, "./risk_engine/plots/dash4_p12.json", auto_unbox = TRUE, pretty = FALSE)
   
   
   
