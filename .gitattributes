@@ -4,3 +4,4 @@ data/lfs/*.rds filter=lfs diff=lfs merge=lfs -text
 data/lfs/gsod_peril.rds filter=lfs diff=lfs merge=lfs -text
 data/lfs/solar_stnid_lookup.csv filter=lfs diff=lfs merge=lfs -text
 risk_engine/plots/dash4_p1.json filter=lfs diff=lfs merge=lfs -text
+risk_engine/plots/dash4_p2.json filter=lfs diff=lfs merge=lfs -text
